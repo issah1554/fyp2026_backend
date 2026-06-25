@@ -1,0 +1,251 @@
+openapi: 3.1.0
+info:
+  title: Smart Market API
+  version: 0.1.0
+  description: Authentication API for the Smart Market and Price Decision Support System.
+servers:
+  - url: http://127.0.0.1:8000/api/v1
+    description: Local development
+tags:
+  - name: Auth
+    description: User registration and JWT authentication.
+paths:
+  /auth/register/:
+    post:
+      tags: [Auth]
+      summary: Register a user
+      operationId: registerUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+            example:
+              username: amina
+              email: amina@example.com
+              password: StrongPass123
+              first_name: Amina
+              last_name: Juma
+              role: farmer
+              phone_number: "+255700000001"
+              organization: Ifakara Farmers Group
+      responses:
+        "201":
+          description: User registered.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+  /auth/login/:
+    post:
+      tags: [Auth]
+      summary: Login and receive JWT tokens
+      operationId: loginUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            example:
+              username: amina
+              password: StrongPass123
+      responses:
+        "200":
+          description: JWT token pair and authenticated user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "401":
+          description: Invalid credentials.
+  /auth/token/refresh/:
+    post:
+      tags: [Auth]
+      summary: Refresh an access token
+      operationId: refreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TokenRefreshRequest"
+      responses:
+        "200":
+          description: New access token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenRefreshResponse"
+        "401":
+          description: Refresh token is invalid or expired.
+  /auth/me/:
+    get:
+      tags: [Auth]
+      summary: Get the current user
+      operationId: getCurrentUser
+      responses:
+        "200":
+          description: Authenticated user profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /auth/logout/:
+    post:
+      tags: [Auth]
+      summary: Logout the current user
+      operationId: logoutUser
+      description: The API is stateless. Clients should delete stored access and refresh tokens.
+      responses:
+        "200":
+          description: Logout acknowledged.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: Logout successful. Discard the access and refresh tokens on the client.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Role:
+      type: string
+      enum:
+        - farmer
+        - entrepreneur
+        - buyer
+        - market_officer
+        - admin
+        - researcher
+    Profile:
+      type: object
+      required: [role, phone_number, organization]
+      properties:
+        role:
+          $ref: "#/components/schemas/Role"
+        phone_number:
+          type: string
+          example: "+255700000001"
+        organization:
+          type: string
+          example: Ifakara Farmers Group
+    User:
+      type: object
+      required: [id, username, email, first_name, last_name, profile]
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: amina
+        email:
+          type: string
+          format: email
+          example: amina@example.com
+        first_name:
+          type: string
+          example: Amina
+        last_name:
+          type: string
+          example: Juma
+        profile:
+          $ref: "#/components/schemas/Profile"
+    RegisterRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: amina
+        email:
+          type: string
+          format: email
+          example: amina@example.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: StrongPass123
+        first_name:
+          type: string
+          example: Amina
+        last_name:
+          type: string
+          example: Juma
+        role:
+          $ref: "#/components/schemas/Role"
+        phone_number:
+          type: string
+          example: "+255700000001"
+        organization:
+          type: string
+          example: Ifakara Farmers Group
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: amina
+        password:
+          type: string
+          format: password
+          example: StrongPass123
+    TokenPair:
+      type: object
+      required: [access, refresh, user]
+      properties:
+        access:
+          type: string
+        refresh:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+    TokenRefreshRequest:
+      type: object
+      required: [refresh]
+      properties:
+        refresh:
+          type: string
+    TokenRefreshResponse:
+      type: object
+      required: [access]
+      properties:
+        access:
+          type: string
+    ErrorResponse:
+      type: object
+      additionalProperties: true
+  responses:
+    Unauthorized:
+      description: Authentication credentials were not provided or are invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ValidationError:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+security:
+  - bearerAuth: []

@@ -180,6 +180,33 @@ External Data Sources
 * Swagger/OpenAPI
 * Bruno API Client
 
+---
+
+## API Documentation
+
+The first API module is authentication, exposed under `/api/v1/auth/`.
+
+### Auth Endpoints
+
+| Method | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| `POST` | `/api/v1/auth/register/` | Register a user and profile role | Public |
+| `POST` | `/api/v1/auth/login/` | Login with username and password | Public |
+| `POST` | `/api/v1/auth/token/refresh/` | Refresh an access token | Public |
+| `GET` | `/api/v1/auth/me/` | Get the authenticated user profile | Bearer token |
+| `POST` | `/api/v1/auth/logout/` | Logout acknowledgement; client discards tokens | Bearer token |
+
+OpenAPI contract: `docs/openapi/openapi.yaml`
+
+Bruno collection: `docs/bruno`
+
+Run the backend locally:
+
+```bash
+python manage.py migrate
+python manage.py runserver
+```
+
 ### Deployment
 
 * Docker
