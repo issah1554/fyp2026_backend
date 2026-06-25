@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -23,6 +24,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ["id", "username", "email", "first_name", "last_name", "profile"]
         read_only_fields = ["id"]
 
+    @extend_schema_field(ProfileSerializer)
     def get_profile(self, user):
         profile, _created = Profile.objects.get_or_create(user=user)
         return ProfileSerializer(profile).data

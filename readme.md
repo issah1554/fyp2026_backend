@@ -198,6 +198,10 @@ The first API module is authentication, exposed under `/api/v1/auth/`.
 
 OpenAPI contract: `docs/openapi/openapi.yaml`
 
+Served OpenAPI schema: `/api/schema/`
+
+Swagger UI: `/api/docs/`
+
 Bruno collection: `docs/bruno`
 
 Run the backend locally:
