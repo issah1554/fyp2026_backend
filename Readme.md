@@ -131,6 +131,22 @@ Run tests without activating the virtualenv:
 .\venv\Scripts\python.exe manage.py test
 ```
 
+## Email
+
+By default, verification emails are printed to the terminal running `runserver`.
+To send real emails, configure SMTP environment variables before starting Django:
+
+```powershell
+$env:EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend"
+$env:EMAIL_HOST="smtp.example.com"
+$env:EMAIL_PORT="587"
+$env:EMAIL_USE_TLS="true"
+$env:EMAIL_HOST_USER="your-smtp-username"
+$env:EMAIL_HOST_PASSWORD="your-smtp-password"
+$env:DEFAULT_FROM_EMAIL="Smart Market <noreply@example.com>"
+.\venv\Scripts\python.exe manage.py runserver
+```
+
 ## Admin
 
 Create a superuser:
@@ -165,6 +181,8 @@ python manage.py shell -c "from django.urls import reverse; print(reverse('auth:
 POST /api/v1/auth/register/
 POST /api/v1/auth/login/
 POST /api/v1/auth/token/refresh/
+POST /api/v1/auth/email/verify/
+POST /api/v1/auth/email/resend/
 GET  /api/v1/auth/me/
 POST /api/v1/auth/logout/
 ```

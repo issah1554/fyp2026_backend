@@ -1,8 +1,16 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
+from django.core import mail
+from django.test import override_settings
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from .models import EmailVerificationToken, Profile
 
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
 class AuthApiTests(APITestCase):
     def test_user_can_register(self):
         response = self.client.post(
@@ -22,12 +30,18 @@ class AuthApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(response.data["success"])
-        self.assertEqual(response.data["message"], "User registered successfully.")
+        self.assertEqual(
+            response.data["message"],
+            "User registered successfully. Check your email to verify your account.",
+        )
         self.assertEqual(response.data["data"]["username"], "amina")
         self.assertEqual(response.data["data"]["profile"]["role"], "farmer")
+        self.assertFalse(response.data["data"]["profile"]["is_email_verified"])
         self.assertNotIn("password", response.data["data"])
         self.assertIn("meta", response.data)
         self.assertIn("timestamp", response.data)
+        self.assertEqual(EmailVerificationToken.objects.count(), 1)
+        self.assertEqual(len(mail.outbox), 1)
 
     def test_registration_validation_errors_use_response_schema(self):
         response = self.client.post(
@@ -50,12 +64,56 @@ class AuthApiTests(APITestCase):
         self.assertIn("meta", response.data)
         self.assertIn("timestamp", response.data)
 
+    def test_user_can_verify_email(self):
+        user = get_user_model().objects.create_user(
+            username="amina",
+            email="amina@example.com",
+            password="StrongPass123",
+        )
+        Profile.objects.create(user=user)
+        verification_token = EmailVerificationToken.objects.create(
+            user=user,
+            token="valid-token",
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        response = self.client.post(
+            "/api/v1/auth/email/verify/",
+            {"token": verification_token.token},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["success"])
+        self.assertEqual(response.data["message"], "Email verified successfully.")
+        self.assertTrue(response.data["data"]["profile"]["is_email_verified"])
+        verification_token.refresh_from_db()
+        self.assertIsNotNone(verification_token.used_at)
+
+    def test_unverified_user_cannot_login(self):
+        get_user_model().objects.create_user(
+            username="marketofficer",
+            email="officer@example.com",
+            password="StrongPass123",
+        )
+
+        response = self.client.post(
+            "/api/v1/auth/login/",
+            {"username": "marketofficer", "password": "StrongPass123"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertFalse(response.data["success"])
+        self.assertEqual(response.data["message"], "Email address is not verified.")
+
     def test_user_can_login_refresh_and_get_profile(self):
         user = get_user_model().objects.create_user(
             username="marketofficer",
             email="officer@example.com",
             password="StrongPass123",
         )
+        Profile.objects.create(user=user, email_verified_at=timezone.now())
 
         login_response = self.client.post(
             "/api/v1/auth/login/",
@@ -85,6 +143,24 @@ class AuthApiTests(APITestCase):
         self.assertEqual(me_response.status_code, status.HTTP_200_OK)
         self.assertTrue(me_response.data["success"])
         self.assertEqual(me_response.data["data"]["username"], "marketofficer")
+
+    def test_user_can_resend_email_verification(self):
+        get_user_model().objects.create_user(
+            username="amina",
+            email="amina@example.com",
+            password="StrongPass123",
+        )
+
+        response = self.client.post(
+            "/api/v1/auth/email/resend/",
+            {"email": "amina@example.com"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["success"])
+        self.assertEqual(EmailVerificationToken.objects.count(), 1)
+        self.assertEqual(len(mail.outbox), 1)
 
     def test_me_requires_authentication(self):
         response = self.client.get("/api/v1/auth/me/")

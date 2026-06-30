@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class Profile(models.Model):
@@ -23,8 +24,49 @@ class Profile(models.Model):
     )
     phone_number = models.CharField(max_length=32, blank=True)
     organization = models.CharField(max_length=120, blank=True)
+    email_verified_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    @property
+    def is_email_verified(self):
+        return self.email_verified_at is not None
+
+    def mark_email_verified(self):
+        if self.email_verified_at is None:
+            self.email_verified_at = timezone.now()
+            self.save(update_fields=["email_verified_at", "updated_at"])
+
     def __str__(self):
         return f"{self.user.username} profile"
+
+
+class EmailVerificationToken(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="email_verification_tokens",
+    )
+    token = models.CharField(max_length=96, unique=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    @property
+    def is_used(self):
+        return self.used_at is not None
+
+    @property
+    def is_expired(self):
+        return timezone.now() >= self.expires_at
+
+    def mark_used(self):
+        if self.used_at is None:
+            self.used_at = timezone.now()
+            self.save(update_fields=["used_at"])
+
+    def __str__(self):
+        return f"Email verification token for {self.user}"

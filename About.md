@@ -193,6 +193,8 @@ The first API module is authentication, exposed under `/api/v1/auth/`.
 | `POST` | `/api/v1/auth/register/` | Register a user and profile role | Public |
 | `POST` | `/api/v1/auth/login/` | Login with username and password | Public |
 | `POST` | `/api/v1/auth/token/refresh/` | Refresh an access token | Public |
+| `POST` | `/api/v1/auth/email/verify/` | Verify a user's email verification token | Public |
+| `POST` | `/api/v1/auth/email/resend/` | Resend email verification token | Public |
 | `GET` | `/api/v1/auth/me/` | Get the authenticated user profile | Bearer token |
 | `POST` | `/api/v1/auth/logout/` | Logout acknowledgement; client discards tokens | Bearer token |
 
