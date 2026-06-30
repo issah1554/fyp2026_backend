@@ -60,5 +60,3 @@ class AuthApiTests(APITestCase):
         response = self.client.get("/api/v1/auth/me/")
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
-# Create your tests here.
