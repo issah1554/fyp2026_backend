@@ -1,9 +1,10 @@
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import generics, permissions, status
-from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+
+from apps.common.responses import mutation_payload, mutation_response, success_response
 
 from .serializers import AuthTokenObtainPairSerializer, RegisterSerializer, UserSerializer
 
@@ -21,7 +22,11 @@ class RegisterView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+        return mutation_response(
+            message="User registered successfully.",
+            data=UserSerializer(user).data,
+            status_code=status.HTTP_201_CREATED,
+        )
 
 
 @extend_schema(
@@ -32,6 +37,11 @@ class RegisterView(generics.CreateAPIView):
 class LoginView(TokenObtainPairView):
     serializer_class = AuthTokenObtainPairSerializer
 
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        response.data = mutation_payload(message="Login successful.", data=response.data)
+        return response
+
 
 @extend_schema(
     tags=["Auth"],
@@ -40,6 +50,11 @@ class LoginView(TokenObtainPairView):
 )
 class RefreshTokenView(TokenRefreshView):
     serializer_class = TokenRefreshSerializer
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        response.data = mutation_payload(message="Token refreshed successfully.", data=response.data)
+        return response
 
 
 @extend_schema(
@@ -50,7 +65,7 @@ class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        return Response(UserSerializer(request.user).data)
+        return success_response(UserSerializer(request.user).data)
 
 
 @extend_schema(
@@ -64,7 +79,7 @@ class LogoutView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        return Response(
-            {"detail": "Logout successful. Discard the access and refresh tokens on the client."},
-            status=status.HTTP_200_OK,
+        return mutation_response(
+            message="Logout successful. Discard the access and refresh tokens on the client.",
+            status_code=status.HTTP_200_OK,
         )
