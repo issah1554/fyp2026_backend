@@ -87,6 +87,37 @@ For this project, the auth app code lives in `apps/auth`, but its Django app lab
 python manage.py showmigrations api
 ```
 
+## Environment And Database
+
+Local settings are loaded from `.env`. The project is configured to use PostgreSQL by default through:
+
+```text
+DB_ENGINE=django.db.backends.postgresql
+DB_NAME=fyp2026_backend
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_HOST=127.0.0.1
+DB_PORT=5432
+```
+
+Install dependencies after pulling database changes:
+
+```powershell
+pip install -r requirements.txt
+```
+
+Create the PostgreSQL database before running migrations:
+
+```sql
+CREATE DATABASE fyp2026_backend;
+```
+
+Then apply migrations:
+
+```powershell
+python manage.py migrate
+```
+
 ## Apps Structure
 
 Project apps are grouped under the root `apps/` package.
