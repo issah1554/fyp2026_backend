@@ -164,17 +164,33 @@ Run tests without activating the virtualenv:
 
 ## Email
 
-By default, verification emails are printed to the terminal running `runserver`.
-To send real emails, configure SMTP environment variables before starting Django:
+Verification emails are sent through the SMTP settings in `.env`.
+For local development, use a real SMTP provider or temporarily set `EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend`.
 
 ```powershell
-$env:EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend"
-$env:EMAIL_HOST="smtp.example.com"
-$env:EMAIL_PORT="587"
-$env:EMAIL_USE_TLS="true"
-$env:EMAIL_HOST_USER="your-smtp-username"
-$env:EMAIL_HOST_PASSWORD="your-smtp-password"
-$env:DEFAULT_FROM_EMAIL="Smart Market <noreply@example.com>"
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.example.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=true
+EMAIL_HOST_USER=your-smtp-username
+EMAIL_HOST_PASSWORD=your-smtp-password
+DEFAULT_FROM_EMAIL=Smart Market <your-email@example.com>
+```
+
+For Gmail, use an app password, not your normal Google account password:
+
+```text
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=true
+EMAIL_HOST_USER=your-address@gmail.com
+EMAIL_HOST_PASSWORD=your-google-app-password
+DEFAULT_FROM_EMAIL=Smart Market <your-address@gmail.com>
+```
+
+After updating `.env`, restart Django:
+
+```powershell
 .\venv\Scripts\python.exe manage.py runserver
 ```
 
