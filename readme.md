@@ -1,271 +1,184 @@
-# Smart Market and Price Decision Support System
+# FYP 2026 Backend
 
-### Using Multi-Source Market Data Analytics and USSD Technology
+Django REST backend for the Smart Market and Price Decision Support System.
 
-## Project Overview
+## Setup
 
-The Smart Market and Price Decision Support System is an intelligent market information platform designed to improve access to accurate, timely, and reliable market information for entrepreneurs, farmers, and buyers. The system addresses the challenges of information asymmetry, unreliable pricing information, and limited market intelligence, particularly in rural communities such as Ifakara, Tanzania.
+Create and activate a virtual environment:
 
-The platform integrates data from multiple sources, including market officers, traders, online marketplaces, social media platforms, e-commerce websites, and publicly available APIs. Using data analytics, artificial intelligence, and machine learning techniques, the system analyzes market trends, predicts future commodity prices, and generates recommendations that support informed decision-making.
-
-To ensure accessibility for all users, including those without internet connectivity, the system provides both web-based and USSD-based interfaces, allowing users to access market information using smartphones or basic mobile phones.
-
----
-
-## Problem Statement
-
-Many farmers, entrepreneurs, and buyers rely on informal communication channels such as word-of-mouth, local traders, and physical market visits to obtain market information. These methods are often unreliable, time-consuming, and do not provide real-time market intelligence.
-
-The lack of accurate market information results in:
-
-* Information asymmetry between buyers and sellers.
-* Poor bargaining power for farmers.
-* Reduced profitability and business opportunities.
-* Inefficient resource allocation.
-* Poor production and investment decisions.
-
-The proposed system aims to address these challenges by providing a centralized and intelligent market information platform.
-
----
-
-## Project Objectives
-
-### General Objective
-
-To develop a Smart Market and Price Decision Support System that collects, analyzes, predicts, and disseminates market information from multiple data sources to support entrepreneurs, farmers, and buyers in making informed decisions.
-
-### Specific Objectives
-
-1. Develop a User Management Subsystem.
-2. Develop a Market Data Collection Subsystem.
-3. Develop a Data Scraping and Integration Subsystem.
-4. Develop a Centralized Market Database Subsystem.
-5. Develop a Machine Learning-Based Market Analysis Subsystem.
-6. Develop an AI-Based Price Prediction and Recommendation Subsystem.
-7. Develop a USSD-Based Market Information Access Subsystem.
-8. Develop a Reporting, Visualization, and Decision Support Subsystem.
-
----
-
-## Key Features
-
-### User Management
-
-* User registration and authentication
-* Role-based access control
-* Profile management
-* Permissions and authorization
-
-### Market Data Collection
-
-* Commodity price collection
-* Data submission and validation
-* Historical market records
-
-### Data Integration
-
-* Social media integration
-* Online marketplace integration
-* Public API integration
-* Data cleaning and transformation
-
-### Machine Learning and Analytics
-
-* Market trend analysis
-* Demand forecasting
-* Seasonal pattern identification
-* Business opportunity detection
-
-### Price Prediction
-
-* Commodity price forecasting
-* Recommendation generation
-* Market intelligence insights
-
-### USSD Services
-
-* Price lookup using mobile phones
-* Commodity search
-* Market recommendations
-* Access without internet connectivity
-
-### Reporting and Dashboards
-
-* Analytical dashboards
-* Charts and visualizations
-* Statistical reports
-* Exportable reports
-
----
-
-## Target Users
-
-* Farmers
-* Entrepreneurs
-* Buyers
-* Market Officers
-* Administrators
-* Researchers and Policy Makers
-
----
-
-## Proposed System Architecture
-
-```text
-Users
-│
-├── Web Application
-└── USSD Interface
-        │
-        ▼
-API Gateway
-        │
-        ▼
-Business Services
-│
-├── User Management
-├── Market Data Collection
-├── Data Integration
-├── Analytics Engine
-├── Price Prediction Engine
-├── Recommendation Engine
-├── Reporting Service
-└── Notification Service
-        │
-        ▼
-Centralized Market Database
-        │
-        ▼
-External Data Sources
-├── Market Officers
-├── Traders
-├── Social Media
-├── Online Marketplaces
-└── Public APIs
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
 ```
 
----
+Install dependencies:
 
-## Proposed Technology Stack
+```powershell
+pip install -r requirements.txt
+```
 
-### Backend
+If PowerShell blocks activation scripts, run:
 
-* Django
-* Django REST Framework
-* Simple JWT
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
 
-### Database
+## Run The Project
 
-* PostgreSQL
+Start the development server:
 
-### Machine Learning
-
-* Python
-* Pandas
-* NumPy
-* Scikit-Learn
-
-### Frontend
-
-* React
-* TypeScript
-* Tailwind CSS
-
-### USSD Integration
-
-* Africa's Talking API or Mobile Network USSD Gateway
-
-### Documentation and Testing
-
-* Swagger/OpenAPI
-* Bruno API Client
-
----
-
-## API Documentation
-
-The first API module is authentication, exposed under `/api/v1/auth/`.
-
-### Auth Endpoints
-
-| Method | Endpoint | Description | Auth |
-| --- | --- | --- | --- |
-| `POST` | `/api/v1/auth/register/` | Register a user and profile role | Public |
-| `POST` | `/api/v1/auth/login/` | Login with username and password | Public |
-| `POST` | `/api/v1/auth/token/refresh/` | Refresh an access token | Public |
-| `GET` | `/api/v1/auth/me/` | Get the authenticated user profile | Bearer token |
-| `POST` | `/api/v1/auth/logout/` | Logout acknowledgement; client discards tokens | Bearer token |
-
-OpenAPI contract: `docs/openapi/openapi.yaml`
-
-Served OpenAPI schema: `/api/schema/`
-
-Swagger UI: `/api/docs/`
-
-Bruno collection: `docs/bruno`
-
-Run the backend locally:
-
-```bash
-python manage.py migrate
+```powershell
 python manage.py runserver
 ```
 
-### Deployment
+Or without activating the virtualenv:
 
-* Docker
-* Nginx
-* Ubuntu Server
-
----
-
-## Project Modules
-
-```text
-accounts/
-roles/
-commodities/
-markets/
-market_data/
-scraper/
-analytics/
-predictions/
-recommendations/
-ussd/
-reports/
-notifications/
-audit_logs/
-settings/
-files/
-common/
+```powershell
+.\venv\Scripts\python.exe manage.py runserver
 ```
 
----
+API base URL:
 
-## Expected Benefits
+```text
+http://127.0.0.1:8000/api/v1/
+```
 
-* Improved market transparency.
-* Better decision-making for farmers and entrepreneurs.
-* Reduced information asymmetry.
-* Increased profitability and competitiveness.
-* Improved accessibility through USSD technology.
-* Data-driven market intelligence and forecasting.
-* Support for sustainable economic development.
+Swagger docs:
 
----
+```text
+http://127.0.0.1:8000/api/docs/
+```
 
-## Development Methodology
+OpenAPI schema:
 
-The project follows the Agile Software Development Methodology and is divided into the following sprints:
+```text
+http://127.0.0.1:8000/api/schema/
+```
 
-1. User Management and System Foundation.
-2. Market Data Collection and Integration.
-3. Machine Learning and Price Prediction.
-4. USSD and Reporting Services.
-5. Testing, Deployment, and User Evaluation.
+## Migrations
 
----
+Create migrations after model changes:
 
-## Conclusion
+```powershell
+python manage.py makemigrations
+```
 
-The Smart Market and Price Decision Support System aims to provide an intelligent, scalable, and accessible market information platform that empowers entrepreneurs, farmers, and buyers with reliable market intelligence, predictive analytics, and decision support services. By combining artificial intelligence, machine learning, multi-source data analytics, and USSD technology, the system seeks to improve market efficiency and contribute to socio-economic development in Tanzania and similar communities.
+Apply pending migrations:
+
+```powershell
+python manage.py migrate
+```
+
+Show migration status:
+
+```powershell
+python manage.py showmigrations
+```
+
+Check if model changes need migrations without writing files:
+
+```powershell
+python manage.py makemigrations --check --dry-run
+```
+
+For this project, the auth app code lives in `apps/auth`, but its Django app label is `api` for migration compatibility. To inspect its migrations:
+
+```powershell
+python manage.py showmigrations api
+```
+
+## Apps Structure
+
+Project apps are grouped under the root `apps/` package.
+
+Current app:
+
+```text
+apps/auth/
+```
+
+Auth is installed in `config/settings.py`:
+
+```python
+"apps.auth.apps.AuthConfig"
+```
+
+Create a new app inside `apps/`:
+
+```powershell
+python manage.py startapp app_name apps/app_name
+```
+
+Then add its config class to `INSTALLED_APPS` in `config/settings.py`.
+
+## Tests And Checks
+
+Run tests:
+
+```powershell
+python manage.py test
+```
+
+Run Django system checks:
+
+```powershell
+python manage.py check
+```
+
+Run tests without activating the virtualenv:
+
+```powershell
+.\venv\Scripts\python.exe manage.py test
+```
+
+## Admin
+
+Create a superuser:
+
+```powershell
+python manage.py createsuperuser
+```
+
+Admin URL:
+
+```text
+http://127.0.0.1:8000/admin/
+```
+
+## Useful Django Shell Commands
+
+Open the Django shell:
+
+```powershell
+python manage.py shell
+```
+
+Resolve an auth URL:
+
+```powershell
+python manage.py shell -c "from django.urls import reverse; print(reverse('auth:login'))"
+```
+
+## Auth Endpoints
+
+```text
+POST /api/v1/auth/register/
+POST /api/v1/auth/login/
+POST /api/v1/auth/token/refresh/
+GET  /api/v1/auth/me/
+POST /api/v1/auth/logout/
+```
+
+## Git
+
+Check changed files:
+
+```powershell
+git status --short
+```
+
+View unstaged changes:
+
+```powershell
+git diff
+```
