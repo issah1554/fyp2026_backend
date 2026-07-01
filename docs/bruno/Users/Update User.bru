@@ -1,0 +1,40 @@
+meta {
+  name: Update User
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{base_url}}/api/v1/users/{{managed_user_id}}/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("access_token");
+  const userId = bru.getEnvVar("managed_user_id");
+
+  if (!token) {
+    throw new Error("Missing access_token. Run Auth > Login first.");
+  }
+  if (!userId) {
+    throw new Error("Missing managed_user_id. Run Users > Create User first or set it manually.");
+  }
+
+  req.setHeader("Authorization", `Bearer ${token}`);
+}
+
+body:json {
+  {
+    "first_name": "{{managed_user_first_name}}",
+    "last_name": "{{managed_user_last_name}}",
+    "role": "{{managed_user_role}}",
+    "phone_number": "{{managed_user_phone_number}}",
+    "organization": "{{managed_user_organization}}",
+    "is_active": true
+  }
+}
