@@ -1,0 +1,46 @@
+meta {
+  name: Create User
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/v1/users/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("access_token");
+  if (!token) {
+    throw new Error("Missing access_token. Run Auth > Login first.");
+  }
+
+  req.setHeader("Authorization", `Bearer ${token}`);
+}
+
+body:json {
+  {
+    "username": "{{managed_user_name}}",
+    "email": "{{managed_user_email}}",
+    "password": "{{managed_user_password}}",
+    "first_name": "{{managed_user_first_name}}",
+    "last_name": "{{managed_user_last_name}}",
+    "role": "{{managed_user_role}}",
+    "phone_number": "{{managed_user_phone_number}}",
+    "organization": "{{managed_user_organization}}"
+  }
+}
+
+script:post-response {
+  if (!res.body?.data?.user_id) {
+    bru.setEnvVar("managed_user_id", "");
+    return;
+  }
+
+  bru.setEnvVar("managed_user_id", res.body.data.user_id);
+}
