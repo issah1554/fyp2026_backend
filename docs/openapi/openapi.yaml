@@ -9,6 +9,12 @@ servers:
 tags:
   - name: Auth
     description: User registration and JWT authentication.
+  - name: Users
+    description: Admin user listing and management.
+  - name: Commodity Categories
+    description: Commodity category management.
+  - name: Commodities
+    description: Commodity catalog management.
 paths:
   /auth/register/:
     post:
@@ -118,6 +124,286 @@ paths:
                     example: Logout successful. Discard the access and refresh tokens on the client.
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /users/:
+    get:
+      tags: [Users]
+      summary: List users
+      operationId: listUsers
+      responses:
+        "200":
+          description: Users returned.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ManagedUser"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Users]
+      summary: Create a user
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManagedUserCreateRequest"
+      responses:
+        "201":
+          description: User created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagedUser"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /users/{user_id}/:
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+        example: 8BQ3mN7xTs
+    get:
+      tags: [Users]
+      summary: Get a user
+      operationId: getUser
+      responses:
+        "200":
+          description: User returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagedUser"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Users]
+      summary: Update a user
+      operationId: updateUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManagedUserUpdateRequest"
+      responses:
+        "200":
+          description: User updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagedUser"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Users]
+      summary: Delete a user
+      operationId: deleteUser
+      responses:
+        "200":
+          description: User deleted.
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /commodities/categories/:
+    get:
+      tags: [Commodity Categories]
+      summary: List commodity categories
+      operationId: listCommodityCategories
+      responses:
+        "200":
+          description: Commodity categories returned.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CommodityCategory"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Commodity Categories]
+      summary: Create a commodity category
+      operationId: createCommodityCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommodityCategoryRequest"
+      responses:
+        "201":
+          description: Commodity category created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommodityCategory"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /commodities/categories/{category_id}/:
+    parameters:
+      - name: category_id
+        in: path
+        required: true
+        schema:
+          type: string
+        example: 7VhM42qBc9
+    get:
+      tags: [Commodity Categories]
+      summary: Get a commodity category
+      operationId: getCommodityCategory
+      responses:
+        "200":
+          description: Commodity category returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommodityCategory"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Commodity Categories]
+      summary: Update a commodity category
+      operationId: updateCommodityCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommodityCategoryRequest"
+      responses:
+        "200":
+          description: Commodity category updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommodityCategory"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Commodity Categories]
+      summary: Delete a commodity category
+      operationId: deleteCommodityCategory
+      responses:
+        "200":
+          description: Commodity category deleted.
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /commodities/:
+    get:
+      tags: [Commodities]
+      summary: List commodities
+      operationId: listCommodities
+      responses:
+        "200":
+          description: Commodities returned.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Commodity"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Commodities]
+      summary: Create a commodity
+      operationId: createCommodity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommodityRequest"
+      responses:
+        "201":
+          description: Commodity created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Commodity"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /commodities/{commodity_id}/:
+    parameters:
+      - name: commodity_id
+        in: path
+        required: true
+        schema:
+          type: string
+        example: 8BQ3mN7xTs
+    get:
+      tags: [Commodities]
+      summary: Get a commodity
+      operationId: getCommodity
+      responses:
+        "200":
+          description: Commodity returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Commodity"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Commodities]
+      summary: Update a commodity
+      operationId: updateCommodity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommodityRequest"
+      responses:
+        "200":
+          description: Commodity updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Commodity"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Commodities]
+      summary: Delete a commodity
+      operationId: deleteCommodity
+      responses:
+        "200":
+          description: Commodity deleted.
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   securitySchemes:
     bearerAuth:
@@ -146,6 +432,18 @@ components:
         organization:
           type: string
           example: Ifakara Farmers Group
+    ManagedProfile:
+      allOf:
+        - $ref: "#/components/schemas/Profile"
+        - type: object
+          properties:
+            is_email_verified:
+              type: boolean
+              example: true
+            email_verified_at:
+              type: string
+              format: date-time
+              nullable: true
     User:
       type: object
       required: [user_id, username, email, first_name, last_name, profile]
@@ -168,6 +466,44 @@ components:
           example: Juma
         profile:
           $ref: "#/components/schemas/Profile"
+    ManagedUser:
+      type: object
+      required: [user_id, username, email, first_name, last_name, is_active, is_staff, is_superuser, profile]
+      properties:
+        user_id:
+          type: string
+          example: 8BQ3mN7xTs
+        username:
+          type: string
+          example: amina
+        email:
+          type: string
+          format: email
+          example: amina@example.com
+        first_name:
+          type: string
+          example: Amina
+        last_name:
+          type: string
+          example: Juma
+        is_active:
+          type: boolean
+          example: true
+        is_staff:
+          type: boolean
+          example: false
+        is_superuser:
+          type: boolean
+          example: false
+        date_joined:
+          type: string
+          format: date-time
+        last_login:
+          type: string
+          format: date-time
+          nullable: true
+        profile:
+          $ref: "#/components/schemas/ManagedProfile"
     RegisterRequest:
       type: object
       required: [username, password]
@@ -231,12 +567,163 @@ components:
       properties:
         access:
           type: string
+    ManagedUserCreateRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: buyer1
+        email:
+          type: string
+          format: email
+          example: buyer1@example.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: StrongPass123
+        first_name:
+          type: string
+          example: Buyer
+        last_name:
+          type: string
+          example: One
+        is_active:
+          type: boolean
+          example: true
+        is_staff:
+          type: boolean
+          example: false
+        is_superuser:
+          type: boolean
+          example: false
+        role:
+          $ref: "#/components/schemas/Role"
+        phone_number:
+          type: string
+          example: "+255700000010"
+        organization:
+          type: string
+          example: Market Buyers
+    ManagedUserUpdateRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          example: buyer1
+        email:
+          type: string
+          format: email
+          example: buyer1@example.com
+        first_name:
+          type: string
+          example: Buyer
+        last_name:
+          type: string
+          example: One
+        is_active:
+          type: boolean
+          example: true
+        is_staff:
+          type: boolean
+          example: false
+        is_superuser:
+          type: boolean
+          example: false
+        role:
+          $ref: "#/components/schemas/Role"
+        phone_number:
+          type: string
+          example: "+255700000010"
+        organization:
+          type: string
+          example: Market Buyers
+    CommodityCategory:
+      type: object
+      required: [category_id, name, description, created_at]
+      properties:
+        category_id:
+          type: string
+          example: 7VhM42qBc9
+        name:
+          type: string
+          example: Cereals
+        description:
+          type: string
+          example: Grain crops and cereal products
+        created_at:
+          type: string
+          format: date-time
+    CommodityCategoryRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: Cereals
+        description:
+          type: string
+          example: Grain crops and cereal products
+    Commodity:
+      type: object
+      required: [commodity_id, name, unit, description, categories, created_at]
+      properties:
+        commodity_id:
+          type: string
+          example: 8BQ3mN7xTs
+        name:
+          type: string
+          example: Maize
+        unit:
+          type: string
+          example: kg
+        description:
+          type: string
+          example: Dry maize grain
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommodityCategory"
+        created_at:
+          type: string
+          format: date-time
+    CommodityRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: Maize
+        unit:
+          type: string
+          example: kg
+        description:
+          type: string
+          example: Dry maize grain
+        category_ids:
+          type: array
+          items:
+            type: string
+          example: ["7VhM42qBc9"]
     ErrorResponse:
       type: object
       additionalProperties: true
   responses:
     Unauthorized:
       description: Authentication credentials were not provided or are invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: The authenticated user is not allowed to perform this action.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: The requested resource was not found.
       content:
         application/json:
           schema:
