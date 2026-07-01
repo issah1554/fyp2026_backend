@@ -7,19 +7,23 @@ meta {
 get {
   url: {{base_url}}/api/v1/users/{{managed_user_id}}/
   body: none
-  auth: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
 }
 
 script:pre-request {
   const token = bru.getEnvVar("access_token");
   const userId = bru.getEnvVar("managed_user_id");
-
+  
   if (!token) {
     throw new Error("Missing access_token. Run Auth > Login first.");
   }
   if (!userId) {
     throw new Error("Missing managed_user_id. Run Users > Create User first or set it manually.");
   }
-
+  
   req.setHeader("Authorization", `Bearer ${token}`);
 }
