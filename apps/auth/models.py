@@ -2,6 +2,8 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
+from apps.common.ids import generate_unique_public_id
+
 
 class Profile(models.Model):
     class Role(models.TextChoices):
@@ -17,6 +19,7 @@ class Profile(models.Model):
         on_delete=models.CASCADE,
         related_name="profile",
     )
+    public_id = models.CharField(max_length=10, unique=True, editable=False)
     role = models.CharField(
         max_length=32,
         choices=Role.choices,
@@ -36,6 +39,13 @@ class Profile(models.Model):
         if self.email_verified_at is None:
             self.email_verified_at = timezone.now()
             self.save(update_fields=["email_verified_at", "updated_at"])
+
+    def save(self, *args, **kwargs):
+        if not self.public_id:
+            self.public_id = generate_unique_public_id(Profile)
+            if kwargs.get("update_fields") is not None:
+                kwargs["update_fields"] = set(kwargs["update_fields"]) | {"public_id"}
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.user.username} profile"

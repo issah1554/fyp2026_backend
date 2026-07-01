@@ -148,11 +148,11 @@ components:
           example: Ifakara Farmers Group
     User:
       type: object
-      required: [id, username, email, first_name, last_name, profile]
+      required: [user_id, username, email, first_name, last_name, profile]
       properties:
-        id:
-          type: integer
-          example: 1
+        user_id:
+          type: string
+          example: 8BQ3mN7xTs
         username:
           type: string
           example: amina

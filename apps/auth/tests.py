@@ -35,6 +35,8 @@ class AuthApiTests(APITestCase):
             "User registered successfully. Check your email to verify your account.",
         )
         self.assertEqual(response.data["data"]["username"], "amina")
+        self.assertRegex(response.data["data"]["user_id"], r"^[1-9BCDFGHJKLMNPQRSTVWXYZbcdfghjkmnpqrstvwxyz]{10}$")
+        self.assertNotIn("id", response.data["data"])
         self.assertEqual(response.data["data"]["profile"]["role"], "farmer")
         self.assertFalse(response.data["data"]["profile"]["is_email_verified"])
         self.assertNotIn("password", response.data["data"])
@@ -126,7 +128,8 @@ class AuthApiTests(APITestCase):
         self.assertEqual(login_response.data["message"], "Login successful.")
         self.assertIn("access", login_response.data["data"])
         self.assertIn("refresh", login_response.data["data"])
-        self.assertEqual(login_response.data["data"]["user"]["id"], user.id)
+        self.assertEqual(login_response.data["data"]["user"]["user_id"], user.profile.public_id)
+        self.assertNotIn("id", login_response.data["data"]["user"])
 
         refresh_response = self.client.post(
             "/api/v1/auth/token/refresh/",
@@ -143,6 +146,7 @@ class AuthApiTests(APITestCase):
         self.assertEqual(me_response.status_code, status.HTTP_200_OK)
         self.assertTrue(me_response.data["success"])
         self.assertEqual(me_response.data["data"]["username"], "marketofficer")
+        self.assertEqual(me_response.data["data"]["user_id"], user.profile.public_id)
 
     def test_user_can_resend_email_verification(self):
         get_user_model().objects.create_user(

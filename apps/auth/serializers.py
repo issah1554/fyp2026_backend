@@ -21,12 +21,18 @@ class ProfileSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    user_id = serializers.SerializerMethodField()
     profile = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "first_name", "last_name", "profile"]
-        read_only_fields = ["id"]
+        fields = ["user_id", "username", "email", "first_name", "last_name", "profile"]
+        read_only_fields = ["user_id"]
+
+    @extend_schema_field(serializers.CharField)
+    def get_user_id(self, user):
+        profile, _created = Profile.objects.get_or_create(user=user)
+        return profile.public_id
 
     @extend_schema_field(ProfileSerializer)
     def get_profile(self, user):
@@ -44,7 +50,6 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            "id",
             "username",
             "email",
             "password",
@@ -54,7 +59,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             "phone_number",
             "organization",
         ]
-        read_only_fields = ["id"]
 
     def validate_email(self, value):
         if value and User.objects.filter(email__iexact=value).exists():
