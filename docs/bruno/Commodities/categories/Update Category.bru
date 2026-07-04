@@ -1,7 +1,7 @@
 meta {
   name: Update Category
   type: http
-  seq: 4
+  seq: 1
 }
 
 patch {
@@ -14,23 +14,23 @@ headers {
   Content-Type: application/json
 }
 
+body:json {
+  {
+    "name": "{{commodity_category_name}}",
+    "description": "{{commodity_category_description}}"
+  }
+}
+
 script:pre-request {
   const token = bru.getEnvVar("access_token");
   const categoryId = bru.getEnvVar("commodity_category_id");
-
+  
   if (!token) {
     throw new Error("Missing access_token. Run Auth > Login first.");
   }
   if (!categoryId) {
     throw new Error("Missing commodity_category_id. Run Commodities > Create Category first or set it manually.");
   }
-
+  
   req.setHeader("Authorization", `Bearer ${token}`);
-}
-
-body:json {
-  {
-    "name": "{{commodity_category_name}}",
-    "description": "{{commodity_category_description}}"
-  }
 }

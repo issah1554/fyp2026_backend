@@ -1,7 +1,7 @@
 meta {
   name: Update Commodity
   type: http
-  seq: 9
+  seq: 4
 }
 
 patch {
@@ -14,20 +14,6 @@ headers {
   Content-Type: application/json
 }
 
-script:pre-request {
-  const token = bru.getEnvVar("access_token");
-  const commodityId = bru.getEnvVar("commodity_id");
-
-  if (!token) {
-    throw new Error("Missing access_token. Run Auth > Login first.");
-  }
-  if (!commodityId) {
-    throw new Error("Missing commodity_id. Run Commodities > Create Commodity first or set it manually.");
-  }
-
-  req.setHeader("Authorization", `Bearer ${token}`);
-}
-
 body:json {
   {
     "name": "{{commodity_name}}",
@@ -35,4 +21,18 @@ body:json {
     "description": "{{commodity_description}}",
     "category_ids": ["{{commodity_category_id}}"]
   }
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("access_token");
+  const commodityId = bru.getEnvVar("commodity_id");
+  
+  if (!token) {
+    throw new Error("Missing access_token. Run Auth > Login first.");
+  }
+  if (!commodityId) {
+    throw new Error("Missing commodity_id. Run Commodities > Create Commodity first or set it manually.");
+  }
+  
+  req.setHeader("Authorization", `Bearer ${token}`);
 }

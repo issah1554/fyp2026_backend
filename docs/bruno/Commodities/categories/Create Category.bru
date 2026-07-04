@@ -1,26 +1,21 @@
 meta {
   name: Create Category
   type: http
-  seq: 2
+  seq: 1
 }
 
 post {
   url: {{base_url}}/api/v1/commodities/categories/
   body: json
-  auth: none
+  auth: bearer
 }
 
 headers {
   Content-Type: application/json
 }
 
-script:pre-request {
-  const token = bru.getEnvVar("access_token");
-  if (!token) {
-    throw new Error("Missing access_token. Run Auth > Login first.");
-  }
-
-  req.setHeader("Authorization", `Bearer ${token}`);
+auth:bearer {
+  token: {{access_token}}
 }
 
 body:json {
@@ -30,11 +25,20 @@ body:json {
   }
 }
 
+script:pre-request {
+  const token = bru.getEnvVar("access_token");
+  if (!token) {
+    throw new Error("Missing access_token. Run Auth > Login first.");
+  }
+  
+  req.setHeader("Authorization", `Bearer ${token}`);
+}
+
 script:post-response {
   if (!res.body?.data?.category_id) {
     bru.setEnvVar("commodity_category_id", "");
     return;
   }
-
+  
   bru.setEnvVar("commodity_category_id", res.body.data.category_id);
 }

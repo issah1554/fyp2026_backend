@@ -1,7 +1,7 @@
 meta {
   name: List Commodities
   type: http
-  seq: 6
+  seq: 1
 }
 
 get {
@@ -15,6 +15,6 @@ script:pre-request {
   if (!token) {
     throw new Error("Missing access_token. Run Auth > Login first.");
   }
-
+  
   req.setHeader("Authorization", `Bearer ${token}`);
 }

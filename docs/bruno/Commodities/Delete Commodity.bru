@@ -1,7 +1,7 @@
 meta {
   name: Delete Commodity
   type: http
-  seq: 10
+  seq: 5
 }
 
 delete {
@@ -13,13 +13,13 @@ delete {
 script:pre-request {
   const token = bru.getEnvVar("access_token");
   const commodityId = bru.getEnvVar("commodity_id");
-
+  
   if (!token) {
     throw new Error("Missing access_token. Run Auth > Login first.");
   }
   if (!commodityId) {
     throw new Error("Missing commodity_id. Run Commodities > Create Commodity first or set it manually.");
   }
-
+  
   req.setHeader("Authorization", `Bearer ${token}`);
 }

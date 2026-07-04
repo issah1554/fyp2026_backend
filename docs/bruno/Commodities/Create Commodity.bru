@@ -1,7 +1,7 @@
 meta {
   name: Create Commodity
   type: http
-  seq: 7
+  seq: 2
 }
 
 post {
@@ -14,15 +14,6 @@ headers {
   Content-Type: application/json
 }
 
-script:pre-request {
-  const token = bru.getEnvVar("access_token");
-  if (!token) {
-    throw new Error("Missing access_token. Run Auth > Login first.");
-  }
-
-  req.setHeader("Authorization", `Bearer ${token}`);
-}
-
 body:json {
   {
     "name": "{{commodity_name}}",
@@ -32,11 +23,20 @@ body:json {
   }
 }
 
+script:pre-request {
+  const token = bru.getEnvVar("access_token");
+  if (!token) {
+    throw new Error("Missing access_token. Run Auth > Login first.");
+  }
+  
+  req.setHeader("Authorization", `Bearer ${token}`);
+}
+
 script:post-response {
   if (!res.body?.data?.commodity_id) {
     bru.setEnvVar("commodity_id", "");
     return;
   }
-
+  
   bru.setEnvVar("commodity_id", res.body.data.commodity_id);
 }
