@@ -5,7 +5,7 @@ from django.urls import reverse
 class UssdMenuViewTests(SimpleTestCase):
     def test_initial_menu(self):
         response = self.client.post(
-            reverse("ussp:menu"),
+            reverse("ussd:menu"),
             data={
                 "sessionId": "ATUssdSession123",
                 "serviceCode": "*384*123#",

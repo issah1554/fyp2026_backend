@@ -2,7 +2,7 @@ from django.urls import path
 
 from .views import UssdMenuView
 
-app_name = "ussp"
+app_name = "ussd"
 
 urlpatterns = [
     path("menu/", UssdMenuView.as_view(), name="menu"),
