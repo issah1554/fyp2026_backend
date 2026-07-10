@@ -10,6 +10,7 @@ class CommodityCategory(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        db_table = "commodity_categories"
         ordering = ["name"]
         verbose_name_plural = "commodity categories"
 
@@ -38,6 +39,7 @@ class Commodity(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        db_table = "commodities"
         ordering = ["name"]
         verbose_name_plural = "commodities"
 
@@ -58,6 +60,7 @@ class CommodityCategoryMap(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        db_table = "commodity_category_maps"
         constraints = [
             models.UniqueConstraint(
                 fields=["commodity", "category"],

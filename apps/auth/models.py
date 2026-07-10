@@ -47,6 +47,9 @@ class Profile(models.Model):
                 kwargs["update_fields"] = set(kwargs["update_fields"]) | {"public_id"}
         super().save(*args, **kwargs)
 
+    class Meta:
+        db_table = "users_profiles"
+
     def __str__(self):
         return f"{self.user.username} profile"
 
@@ -63,6 +66,7 @@ class EmailVerificationToken(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        db_table = "email_verification_tokens"
         ordering = ["-created_at"]
 
     @property
