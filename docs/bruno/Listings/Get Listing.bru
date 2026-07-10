@@ -1,0 +1,18 @@
+meta {
+  name: Get Listing
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{base_url}}/api/v1/listings/{{listing_id}}/
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("access_token");
+  if (token) {
+    req.setHeader("Authorization", `Bearer ${token}`);
+  }
+}

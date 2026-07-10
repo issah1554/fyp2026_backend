@@ -1,0 +1,30 @@
+meta {
+  name: Update Area
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{base_url}}/api/v1/areas/{{area_id}}/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Morogoro Region Updated"
+  }
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("access_token");
+  if (!token) {
+    throw new Error("Missing access_token. Run Auth > Login first.");
+  }
+  
+  req.setHeader("Authorization", `Bearer ${token}`);
+}

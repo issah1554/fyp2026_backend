@@ -1,0 +1,40 @@
+meta {
+  name: Create Order
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/v1/orders/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "listing_id": "{{listing_id}}",
+    "quantity": "5.00"
+  }
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("access_token");
+  if (!token) {
+    throw new Error("Missing access_token. Run Auth > Login first.");
+  }
+  
+  req.setHeader("Authorization", `Bearer ${token}`);
+}
+
+script:post-response {
+  if (!res.body?.data?.order_id) {
+    bru.setEnvVar("order_id", "");
+    return;
+  }
+  
+  bru.setEnvVar("order_id", res.body.data.order_id);
+}

@@ -3,7 +3,7 @@ CREATE TABLE adm_areas (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(150) NOT NULL,
     parent_id BIGINT NULL,
-    area_type VARCHAR(50),
+    level VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (parent_id) REFERENCES adm_areas(id)
 );

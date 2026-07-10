@@ -1,0 +1,17 @@
+meta {
+  name: List Areas
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/api/v1/areas/?level=region
+  body: none
+  auth: none
+}
+
+params:query {
+  level: region
+  ~search: Dodoma
+  ~parent_id: {{parent_area_id}}
+}

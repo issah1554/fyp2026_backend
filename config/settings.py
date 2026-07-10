@@ -66,6 +66,8 @@ INSTALLED_APPS = [
     "apps.auth.apps.AuthConfig",
     "apps.users.apps.UsersConfig",
     "apps.commodities.apps.CommoditiesConfig",
+    "apps.listings.apps.ListingsConfig",
+    "apps.orders.apps.OrdersConfig",
 ]
 
 MIDDLEWARE = [

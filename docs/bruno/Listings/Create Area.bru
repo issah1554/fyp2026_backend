@@ -1,0 +1,41 @@
+meta {
+  name: Create Area
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/v1/areas/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Morogoro Region",
+    "level": "region",
+    "parent_id": null
+  }
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("access_token");
+  if (!token) {
+    throw new Error("Missing access_token. Run Auth > Login first.");
+  }
+  
+  req.setHeader("Authorization", `Bearer ${token}`);
+}
+
+script:post-response {
+  if (!res.body?.data?.area_id) {
+    bru.setEnvVar("area_id", "");
+    return;
+  }
+  
+  bru.setEnvVar("area_id", res.body.data.area_id);
+}

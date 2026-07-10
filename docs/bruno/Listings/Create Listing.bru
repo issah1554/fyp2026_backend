@@ -1,0 +1,45 @@
+meta {
+  name: Create Listing
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{base_url}}/api/v1/listings/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "commodity_id": "{{commodity_id}}",
+    "adm_area_id": "{{area_id}}",
+    "title": "Fresh Morogoro Maize",
+    "description": "Premium quality sun-dried maize grain",
+    "price": "4500.00",
+    "quantity": "100.00",
+    "image_urls": ["https://example.com/maize1.png"]
+  }
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("access_token");
+  if (!token) {
+    throw new Error("Missing access_token. Run Auth > Login first.");
+  }
+  
+  req.setHeader("Authorization", `Bearer ${token}`);
+}
+
+script:post-response {
+  if (!res.body?.data?.listing_id) {
+    bru.setEnvVar("listing_id", "");
+    return;
+  }
+  
+  bru.setEnvVar("listing_id", res.body.data.listing_id);
+}
