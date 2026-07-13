@@ -8,13 +8,15 @@ from apps.common.responses import mutation_payload, mutation_response, success_r
 
 from .serializers import (
     AuthTokenObtainPairSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
     RegisterSerializer,
     ResendEmailVerificationSerializer,
     UserSerializer,
     VerifyEmailSerializer,
 )
 from .models import Profile
-from .services import send_email_verification
+from .services import send_email_verification, send_password_reset
 
 
 @extend_schema(
@@ -103,6 +105,44 @@ class ResendEmailVerificationView(APIView):
                 send_email_verification(user)
         return mutation_response(
             message="If the account exists and is unverified, a verification email has been sent.",
+            status_code=status.HTTP_200_OK,
+        )
+
+
+@extend_schema(
+    tags=["Auth"],
+    request=PasswordResetRequestSerializer,
+    responses={200: OpenApiResponse(description="Password reset request accepted.")},
+)
+class PasswordResetRequestView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.context.get("user")
+        if user is not None:
+            send_password_reset(user)
+        return mutation_response(
+            message="If the account exists, a password reset link has been sent.",
+            status_code=status.HTTP_200_OK,
+        )
+
+
+@extend_schema(
+    tags=["Auth"],
+    request=PasswordResetConfirmSerializer,
+    responses={200: OpenApiResponse(description="Password reset completed.")},
+)
+class PasswordResetConfirmView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return mutation_response(
+            message="Password reset successful.",
             status_code=status.HTTP_200_OK,
         )
 

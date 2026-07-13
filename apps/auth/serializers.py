@@ -6,7 +6,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import EmailVerificationToken, Profile
+from .models import EmailVerificationToken, PasswordResetToken, Profile
 
 User = get_user_model()
 
@@ -123,3 +123,35 @@ class ResendEmailVerificationSerializer(serializers.Serializer):
     def validate_email(self, value):
         self.context["user"] = User.objects.filter(email__iexact=value).first()
         return value
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        self.context["user"] = User.objects.filter(email__iexact=value).first()
+        return value
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    password = serializers.CharField(write_only=True, min_length=8)
+
+    def validate_token(self, value):
+        reset_token = PasswordResetToken.objects.select_related("user").filter(token=value).first()
+        if reset_token is None or reset_token.is_used or reset_token.is_expired:
+            raise serializers.ValidationError("Token is invalid or expired.")
+        self.context["reset_token"] = reset_token
+        return value
+
+    def validate_password(self, value):
+        validate_password(value)
+        return value
+
+    @transaction.atomic
+    def save(self, **kwargs):
+        reset_token = self.context["reset_token"]
+        reset_token.user.set_password(self.validated_data["password"])
+        reset_token.user.save(update_fields=["password"])
+        reset_token.mark_used()
+        return reset_token.user

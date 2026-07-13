@@ -7,7 +7,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import EmailVerificationToken, Profile
+from .models import EmailVerificationToken, PasswordResetToken, Profile
 
 
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
@@ -177,6 +177,64 @@ class AuthApiTests(APITestCase):
         self.assertTrue(response.data["success"])
         self.assertEqual(EmailVerificationToken.objects.count(), 1)
         self.assertEqual(len(mail.outbox), 1)
+
+    def test_user_can_request_password_reset(self):
+        get_user_model().objects.create_user(
+            username="amina",
+            email="amina@example.com",
+            password="StrongPass123",
+        )
+
+        response = self.client.post(
+            "/api/v1/auth/password/reset/request/",
+            {"email": "amina@example.com"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["success"])
+        self.assertEqual(response.data["message"], "If the account exists, a password reset link has been sent.")
+        self.assertEqual(PasswordResetToken.objects.count(), 1)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_password_reset_request_does_not_reveal_missing_account(self):
+        response = self.client.post(
+            "/api/v1/auth/password/reset/request/",
+            {"email": "missing@example.com"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["success"])
+        self.assertEqual(response.data["message"], "If the account exists, a password reset link has been sent.")
+        self.assertEqual(PasswordResetToken.objects.count(), 0)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_user_can_confirm_password_reset(self):
+        user = get_user_model().objects.create_user(
+            username="amina",
+            email="amina@example.com",
+            password="StrongPass123",
+        )
+        reset_token = PasswordResetToken.objects.create(
+            user=user,
+            token="valid-reset-token",
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        response = self.client.post(
+            "/api/v1/auth/password/reset/confirm/",
+            {"token": reset_token.token, "password": "NewStrongPass123"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["success"])
+        self.assertEqual(response.data["message"], "Password reset successful.")
+        reset_token.refresh_from_db()
+        self.assertIsNotNone(reset_token.used_at)
+        user.refresh_from_db()
+        self.assertTrue(user.check_password("NewStrongPass123"))
 
     def test_me_requires_authentication(self):
         response = self.client.get("/api/v1/auth/me/")
