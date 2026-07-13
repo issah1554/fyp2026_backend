@@ -1,11 +1,11 @@
 meta {
-  name: Update Listing
+  name: Create Multiple Area
   type: http
-  seq: 4
+  seq: 3
 }
 
-patch {
-  url: {{base_url}}/api/v1/listings/{{listing_id}}/
+post {
+  url: {{base_url}}/api/v1/areas/bulk
   body: json
   auth: none
 }
@@ -16,8 +16,9 @@ headers {
 
 body:json {
   {
-    "price": "4300.00",
-    "quantity": "95.00"
+    "name": "Morogoro Region",
+    "level": "region",
+    "parent_id": null
   }
 }
 
@@ -28,4 +29,13 @@ script:pre-request {
   }
   
   req.setHeader("Authorization", `Bearer ${token}`);
+}
+
+script:post-response {
+  if (!res.body?.data?.area_id) {
+    bru.setEnvVar("area_id", "");
+    return;
+  }
+  
+  bru.setEnvVar("area_id", res.body.data.area_id);
 }

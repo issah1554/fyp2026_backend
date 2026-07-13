@@ -1,23 +1,13 @@
 meta {
-  name: Update Area
+  name: Delete Area
   type: http
-  seq: 4
+  seq: 6
 }
 
-patch {
+delete {
   url: {{base_url}}/api/v1/areas/{{area_id}}/
-  body: json
+  body: none
   auth: none
-}
-
-headers {
-  Content-Type: application/json
-}
-
-body:json {
-  {
-    "name": "Morogoro Region Updated"
-  }
 }
 
 script:pre-request {
