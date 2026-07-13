@@ -213,6 +213,26 @@ class AreasApiTests(APITestCase):
         self.assertEqual(response.data["meta"]["pagination"]["page_size"], 5)
         self.assertEqual(response.data["meta"]["pagination"]["total_items"], 12)
         self.assertEqual(response.data["meta"]["pagination"]["total_pages"], 3)
+        self.assertEqual(response.data["meta"]["totals"]["total"], 12)
+        self.assertEqual(response.data["meta"]["totals"]["regions"], 12)
+        self.assertEqual(response.data["meta"]["totals"]["districts"], 0)
+        self.assertEqual(response.data["meta"]["totals"]["wards"], 0)
+
+    def test_adm_areas_list_totals_are_not_limited_by_pagination_or_filters(self):
+        parent_region = AdmArea.objects.create(name="Morogoro", level="region")
+        district = AdmArea.objects.create(name="Kilombero", level="district", parent=parent_region)
+        AdmArea.objects.create(name="Ifakara", level="ward", parent=district)
+        AdmArea.objects.create(name="Arusha", level="region")
+
+        self.client.force_authenticate(user=None)
+        response = self.client.get("/api/v1/areas/", {"level": "ward", "page": 1, "page_size": 1})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["meta"]["pagination"]["total_items"], 1)
+        self.assertEqual(response.data["meta"]["totals"]["total"], 4)
+        self.assertEqual(response.data["meta"]["totals"]["regions"], 2)
+        self.assertEqual(response.data["meta"]["totals"]["districts"], 1)
+        self.assertEqual(response.data["meta"]["totals"]["wards"], 1)
 
     def test_adm_areas_filtering(self):
         parent_region = AdmArea.objects.create(name="Arusha", level="region")

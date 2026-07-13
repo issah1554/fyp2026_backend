@@ -22,6 +22,15 @@ DEFAULT_PAGE_SIZE = 10
 MAX_PAGE_SIZE = 100
 
 
+def area_totals():
+    return {
+        "total": AdmArea.objects.count(),
+        "regions": AdmArea.objects.filter(level=AdmArea.Level.REGION).count(),
+        "districts": AdmArea.objects.filter(level=AdmArea.Level.DISTRICT).count(),
+        "wards": AdmArea.objects.filter(level=AdmArea.Level.WARD).count(),
+    }
+
+
 def positive_int(value, default):
     try:
         parsed = int(value)
@@ -132,6 +141,7 @@ class AdmAreaListCreateView(AdmAreaMixin, APIView):
                 },
                 "sorting": {"ordering": "name"},
                 "search": search or "",
+                "totals": area_totals(),
             },
         )
 
