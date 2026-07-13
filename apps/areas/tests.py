@@ -200,6 +200,20 @@ class AreasApiTests(APITestCase):
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)
         self.assertTrue(list_response.data["success"])
 
+    def test_adm_areas_list_is_paginated(self):
+        for index in range(12):
+            AdmArea.objects.create(name=f"Region {index:02d}", level="region")
+
+        self.client.force_authenticate(user=None)
+        response = self.client.get("/api/v1/areas/", {"page": 2, "page_size": 5})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["data"]), 5)
+        self.assertEqual(response.data["meta"]["pagination"]["page"], 2)
+        self.assertEqual(response.data["meta"]["pagination"]["page_size"], 5)
+        self.assertEqual(response.data["meta"]["pagination"]["total_items"], 12)
+        self.assertEqual(response.data["meta"]["pagination"]["total_pages"], 3)
+
     def test_adm_areas_filtering(self):
         parent_region = AdmArea.objects.create(name="Arusha", level="region")
         AdmArea.objects.create(name="Meru", level="district", parent=parent_region)

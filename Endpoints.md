@@ -56,7 +56,7 @@ Status values:
 
 | Method | Path | Notes | Auth | Status |
 | --- | --- | --- | --- | --- |
-| GET | `/api/v1/areas/` | List administrative areas. Supports `level`, `search`, and `parent_id` filters. | None | Working |
+| GET | `/api/v1/areas/` | List administrative areas. Supports `level`, `search`, `parent_id`, `page`, and `page_size` query parameters. | None | Working |
 | POST | `/api/v1/areas/` | Create administrative area. Regions must not include a parent. Districts require a region parent. Wards require a district parent. | Admin bearer token | Working |
 | POST | `/api/v1/areas/bulk` | Bulk import administrative areas by path. Finds existing areas or creates missing parents automatically. | Admin bearer token | Working |
 | GET | `/api/v1/areas/{area_id}/` | Get administrative area by public ID. | None | Working |

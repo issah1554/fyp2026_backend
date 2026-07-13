@@ -1,5 +1,6 @@
-from django.shortcuts import get_object_or_404
 from django.db import IntegrityError, connection, transaction
+from django.core.paginator import EmptyPage, Paginator
+from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.views import APIView
@@ -16,6 +17,17 @@ AREA_PATH_LEVELS = [
     AdmArea.Level.DISTRICT,
     AdmArea.Level.WARD,
 ]
+
+DEFAULT_PAGE_SIZE = 10
+MAX_PAGE_SIZE = 100
+
+
+def positive_int(value, default):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
 
 
 def sync_adm_area_id_sequence():
@@ -94,7 +106,34 @@ class AdmAreaListCreateView(AdmAreaMixin, APIView):
         if parent_id:
             queryset = queryset.filter(parent__public_id=parent_id)
 
-        return collection_response(AdmAreaSerializer(queryset, many=True).data)
+        page_number = positive_int(request.query_params.get("page"), 1)
+        page_size = min(positive_int(request.query_params.get("page_size"), DEFAULT_PAGE_SIZE), MAX_PAGE_SIZE)
+        paginator = Paginator(queryset, page_size)
+
+        try:
+            page = paginator.page(page_number)
+        except EmptyPage:
+            page = paginator.page(paginator.num_pages)
+
+        return collection_response(
+            AdmAreaSerializer(page.object_list, many=True).data,
+            meta={
+                "pagination": {
+                    "page": page.number,
+                    "page_size": page_size,
+                    "total_items": paginator.count,
+                    "total_pages": paginator.num_pages,
+                    "has_next": page.has_next(),
+                    "has_previous": page.has_previous(),
+                },
+                "filters": {
+                    "level": level or "",
+                    "parent_id": parent_id or "",
+                },
+                "sorting": {"ordering": "name"},
+                "search": search or "",
+            },
+        )
 
     @extend_schema(request=AdmAreaSerializer, responses={201: AdmAreaSerializer})
     def post(self, request):
