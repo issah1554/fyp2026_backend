@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404
+from django.db import IntegrityError, connection, transaction
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.views import APIView
@@ -7,7 +8,62 @@ from apps.common.responses import collection_response, mutation_response, succes
 
 from .models import AdmArea
 from .permissions import IsAdminOrReadOnly
-from .serializers import AdmAreaSerializer
+from .serializers import AdmAreaPathImportSerializer, AdmAreaSerializer
+
+
+AREA_PATH_LEVELS = [
+    AdmArea.Level.REGION,
+    AdmArea.Level.DISTRICT,
+    AdmArea.Level.WARD,
+]
+
+
+def sync_adm_area_id_sequence():
+    if connection.vendor != "postgresql":
+        return
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT setval(
+                pg_get_serial_sequence('adm_areas', 'id'),
+                COALESCE((SELECT MAX(id) FROM adm_areas), 1),
+                (SELECT COUNT(*) FROM adm_areas) > 0
+            )
+            """
+        )
+
+
+def get_area_by_path(path):
+    parent = None
+    area = None
+
+    for index, name in enumerate(path):
+        area = AdmArea.objects.filter(
+            name=name,
+            level=AREA_PATH_LEVELS[index],
+            parent=parent,
+        ).first()
+        if area is None:
+            return None
+        parent = area
+
+    return area
+
+
+def create_area_path(path):
+    parent = None
+    area = None
+
+    for index, name in enumerate(path):
+        area, _created = AdmArea.objects.get_or_create(
+            name=name,
+            level=AREA_PATH_LEVELS[index],
+            parent=parent,
+        )
+        parent = area
+
+    return area
 
 
 class AdmAreaMixin:
@@ -54,15 +110,59 @@ class AdmAreaListCreateView(AdmAreaMixin, APIView):
 
 @extend_schema(tags=["Administrative Areas"])
 class AdmAreaBulkCreateView(AdmAreaMixin, APIView):
-    @extend_schema(request=AdmAreaSerializer(many=True), responses={201: AdmAreaSerializer(many=True)})
+    @extend_schema(request=AdmAreaPathImportSerializer(many=True), responses={200: OpenApiResponse(description="Bulk import result.")})
     def post(self, request):
-        serializer = AdmAreaSerializer(data=request.data, many=True)
+        serializer = AdmAreaPathImportSerializer(data=request.data, many=True)
         serializer.is_valid(raise_exception=True)
-        areas = serializer.save()
+
+        sync_adm_area_id_sequence()
+        created = []
+        skipped = []
+        failed = []
+
+        for index, item in enumerate(serializer.validated_data):
+            path = item["path"]
+            existing = get_area_by_path(path)
+            if existing is not None:
+                skipped.append(
+                    {
+                        "index": index,
+                        "reason": "duplicate",
+                        "message": "Area path already exists.",
+                        "area": AdmAreaSerializer(existing).data,
+                        "path": path,
+                    }
+                )
+                continue
+
+            try:
+                with transaction.atomic():
+                    created.append(create_area_path(path))
+            except IntegrityError as exc:
+                sync_adm_area_id_sequence()
+                failed.append(
+                    {
+                        "index": index,
+                        "reason": "integrity_error",
+                        "message": str(exc),
+                        "path": path,
+                    }
+                )
+
+        result_status = status.HTTP_201_CREATED if created and not failed else status.HTTP_200_OK
         return mutation_response(
-            message="Administrative areas created successfully.",
-            data=AdmAreaSerializer(areas, many=True).data,
-            status_code=status.HTTP_201_CREATED,
+            message="Administrative area bulk import completed.",
+            data={
+                "created": AdmAreaSerializer(created, many=True).data,
+                "skipped": skipped,
+                "failed": failed,
+            },
+            meta={
+                "created_count": len(created),
+                "skipped_count": len(skipped),
+                "failed_count": len(failed),
+            },
+            status_code=result_status,
         )
 
 

@@ -77,23 +77,79 @@ class AreasApiTests(APITestCase):
 
     def test_admin_can_bulk_create_adm_areas_without_trailing_slash(self):
         self.client.force_authenticate(self.admin)
-        region = AdmArea.objects.create(name="Morogoro", level="region")
 
         response = self.client.post(
             "/api/v1/areas/bulk",
             [
-                {"name": "Ifakara", "level": "district", "parent_id": region.public_id},
-                {"name": "Kilombero", "level": "district", "parent_id": region.public_id},
+                {"level": "region", "path": ["Morogoro"]},
+                {"level": "district", "path": ["Morogoro", "Kilombero"]},
+                {"level": "ward", "path": ["Morogoro", "Kilombero", "Ifakara"]},
             ],
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(response.data["success"])
-        self.assertEqual(response.data["message"], "Administrative areas created successfully.")
-        self.assertEqual(len(response.data["data"]), 2)
-        self.assertTrue(AdmArea.objects.filter(name="Ifakara").exists())
-        self.assertTrue(AdmArea.objects.filter(name="Kilombero").exists())
+        self.assertEqual(response.data["message"], "Administrative area bulk import completed.")
+        self.assertEqual(len(response.data["data"]["created"]), 3)
+        self.assertEqual(response.data["meta"]["created_count"], 3)
+        self.assertEqual(response.data["meta"]["skipped_count"], 0)
+        region = AdmArea.objects.get(name="Morogoro", level="region")
+        district = AdmArea.objects.get(name="Kilombero", level="district", parent=region)
+        self.assertTrue(AdmArea.objects.filter(name="Ifakara", level="ward", parent=district).exists())
+
+    def test_bulk_area_import_is_idempotent_by_path(self):
+        self.client.force_authenticate(self.admin)
+        payload = [
+            {"level": "ward", "path": ["Morogoro", "Kilombero", "Ifakara"]},
+            {"level": "ward", "path": ["Morogoro", "Kilombero", "Mngeta"]},
+        ]
+
+        first_response = self.client.post("/api/v1/areas/bulk", payload, format="json")
+        second_response = self.client.post("/api/v1/areas/bulk", payload, format="json")
+
+        self.assertEqual(first_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(second_response.data["meta"]["created_count"], 0)
+        self.assertEqual(second_response.data["meta"]["skipped_count"], 2)
+        self.assertEqual(second_response.data["data"]["skipped"][0]["reason"], "duplicate")
+        self.assertEqual(AdmArea.objects.filter(name="Morogoro", level="region").count(), 1)
+        self.assertEqual(AdmArea.objects.filter(name="Kilombero", level="district").count(), 1)
+        self.assertEqual(AdmArea.objects.filter(level="ward").count(), 2)
+
+    def test_bulk_area_import_creates_new_rows_and_reports_duplicates(self):
+        self.client.force_authenticate(self.admin)
+        region = AdmArea.objects.create(name="Morogoro", level="region")
+        district = AdmArea.objects.create(name="Kilombero", level="district", parent=region)
+        AdmArea.objects.create(name="Ifakara", level="ward", parent=district)
+
+        response = self.client.post(
+            "/api/v1/areas/bulk",
+            [
+                {"level": "ward", "path": ["Morogoro", "Kilombero", "Ifakara"]},
+                {"level": "ward", "path": ["Morogoro", "Kilombero", "Mngeta"]},
+            ],
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["meta"]["created_count"], 1)
+        self.assertEqual(response.data["meta"]["skipped_count"], 1)
+        self.assertEqual(response.data["data"]["skipped"][0]["path"], ["Morogoro", "Kilombero", "Ifakara"])
+        self.assertTrue(AdmArea.objects.filter(name="Mngeta", level="ward", parent=district).exists())
+
+    def test_bulk_area_import_rejects_invalid_path_for_level(self):
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.post(
+            "/api/v1/areas/bulk",
+            [{"level": "ward", "path": ["Ifakara"]}],
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(response.data["success"])
+        self.assertTrue(response.data["errors"])
 
     def test_district_and_ward_require_correct_parent_levels(self):
         self.client.force_authenticate(self.admin)

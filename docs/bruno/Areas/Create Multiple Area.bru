@@ -17,19 +17,20 @@ headers {
 body:json {
   [
     {
-      "name": "Kilombero District",
-      "level": "district",
-      "parent_id": "{{region_area_id}}"
+      "level": "region",
+      "path": ["Morogoro"]
     },
     {
-      "name": "Ulanga District",
       "level": "district",
-      "parent_id": "{{region_area_id}}"
+      "path": ["Morogoro", "Kilombero"]
     },
     {
-      "name": "Ifakara Ward",
       "level": "ward",
-      "parent_id": "{{district_area_id}}"
+      "path": ["Morogoro", "Kilombero", "Ifakara"]
+    },
+    {
+      "level": "ward",
+      "path": ["Morogoro", "Kilombero", "Mngeta"]
     }
   ]
 }
@@ -44,14 +45,15 @@ script:pre-request {
 }
 
 script:post-response {
-  const areas = Array.isArray(res.body?.data) ? res.body.data : [];
+  const areas = Array.isArray(res.body?.data?.created) ? res.body.data.created : [];
   if (!areas.length) {
     bru.setEnvVar("area_ids", "");
-    return;
   }
   
-  bru.setEnvVar("area_ids", areas.map((area) => area.area_id).filter(Boolean).join(","));
-  bru.setEnvVar("area_id", areas[0]?.area_id || "");
+  const realAreas = areas.filter((area) => area.area_id);
+  bru.setEnvVar("area_ids", realAreas.map((area) => area.area_id).join(","));
+  bru.setEnvVar("area_id", realAreas[0]?.area_id || "");
   bru.setEnvVar("district_area_id", areas.find((area) => area.level === "district")?.area_id || "");
   bru.setEnvVar("ward_area_id", areas.find((area) => area.level === "ward")?.area_id || "");
+  bru.setEnvVar("region_area_id", areas.find((area) => area.level === "region")?.area_id || "");
 }

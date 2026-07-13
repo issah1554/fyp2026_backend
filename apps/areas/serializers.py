@@ -69,3 +69,56 @@ class AdmAreaSerializer(serializers.ModelSerializer):
             setattr(instance, field, value)
         instance.save()
         return instance
+
+
+class AdmAreaPathImportSerializer(serializers.Serializer):
+    level = serializers.ChoiceField(choices=AdmArea.Level.choices)
+    path = serializers.ListField(
+        child=serializers.CharField(allow_blank=False, trim_whitespace=True),
+        min_length=1,
+        max_length=3,
+    )
+
+    expected_path_lengths = {
+        AdmArea.Level.REGION: 1,
+        AdmArea.Level.DISTRICT: 2,
+        AdmArea.Level.WARD: 3,
+    }
+
+    path_levels = [
+        AdmArea.Level.REGION,
+        AdmArea.Level.DISTRICT,
+        AdmArea.Level.WARD,
+    ]
+
+    def validate(self, attrs):
+        level = attrs["level"]
+        path = attrs["path"]
+        expected_length = self.expected_path_lengths[level]
+
+        if len(path) != expected_length:
+            raise serializers.ValidationError(
+                {"path": f"{level.title()} imports require a path with {expected_length} item(s)."}
+            )
+
+        normalized_path = [name.strip() for name in path]
+        if any(not name for name in normalized_path):
+            raise serializers.ValidationError({"path": "Path items cannot be blank."})
+
+        attrs["path"] = normalized_path
+        return attrs
+
+    def create(self, validated_data):
+        parent = None
+        area = None
+
+        for index, name in enumerate(validated_data["path"]):
+            level = self.path_levels[index]
+            area, _created = AdmArea.objects.get_or_create(
+                name=name,
+                level=level,
+                parent=parent,
+            )
+            parent = area
+
+        return area
