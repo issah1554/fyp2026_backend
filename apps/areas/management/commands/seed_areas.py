@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from apps.listings.models import AdmArea
-from apps.listings.data.tz_areas import TZ_AREAS
+from apps.areas.models import AdmArea
+from apps.areas.data.tz_areas import TZ_AREAS
 from apps.common.ids import generate_unique_public_id
 
 

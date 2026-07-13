@@ -15,11 +15,23 @@ headers {
 }
 
 body:json {
-  {
-    "name": "Morogoro Region",
-    "level": "region",
-    "parent_id": null
-  }
+  [
+    {
+      "name": "Kilombero District",
+      "level": "district",
+      "parent_id": "{{region_area_id}}"
+    },
+    {
+      "name": "Ulanga District",
+      "level": "district",
+      "parent_id": "{{region_area_id}}"
+    },
+    {
+      "name": "Ifakara Ward",
+      "level": "ward",
+      "parent_id": "{{district_area_id}}"
+    }
+  ]
 }
 
 script:pre-request {
@@ -32,10 +44,14 @@ script:pre-request {
 }
 
 script:post-response {
-  if (!res.body?.data?.area_id) {
-    bru.setEnvVar("area_id", "");
+  const areas = Array.isArray(res.body?.data) ? res.body.data : [];
+  if (!areas.length) {
+    bru.setEnvVar("area_ids", "");
     return;
   }
   
-  bru.setEnvVar("area_id", res.body.data.area_id);
+  bru.setEnvVar("area_ids", areas.map((area) => area.area_id).filter(Boolean).join(","));
+  bru.setEnvVar("area_id", areas[0]?.area_id || "");
+  bru.setEnvVar("district_area_id", areas.find((area) => area.level === "district")?.area_id || "");
+  bru.setEnvVar("ward_area_id", areas.find((area) => area.level === "ward")?.area_id || "");
 }

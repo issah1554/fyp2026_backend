@@ -1,51 +1,10 @@
-from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from apps.areas.models import AdmArea
+from apps.areas.serializers import AdmAreaSerializer
 from apps.commodities.serializers import CommoditySerializer
 from apps.commodities.models import Commodity
-from .models import AdmArea, CommodityListing, ListingImage
-
-
-class AdmAreaSerializer(serializers.ModelSerializer):
-    area_id = serializers.CharField(source="public_id", read_only=True)
-    parent_id = serializers.CharField(write_only=True, required=False, allow_null=True)
-    parent = serializers.SerializerMethodField()
-
-    class Meta:
-        model = AdmArea
-        fields = ["area_id", "name", "parent_id", "parent", "level", "created_at"]
-        read_only_fields = ["area_id", "parent", "created_at"]
-
-    @extend_schema_field(serializers.DictField)
-    def get_parent(self, obj):
-        if obj.parent:
-            return {
-                "area_id": obj.parent.public_id,
-                "name": obj.parent.name,
-                "level": obj.parent.level,
-            }
-        return None
-
-    def validate_parent_id(self, value):
-        if value:
-            parent = AdmArea.objects.filter(public_id=value).first()
-            if not parent:
-                raise serializers.ValidationError(f"Administrative Area with public_id '{value}' does not exist.")
-            return parent
-        return None
-
-    def create(self, validated_data):
-        parent = validated_data.pop("parent_id", None)
-        area = AdmArea.objects.create(parent=parent, **validated_data)
-        return area
-
-    def update(self, instance, validated_data):
-        if "parent_id" in validated_data:
-            instance.parent = validated_data.pop("parent_id")
-        for field, value in validated_data.items():
-            setattr(instance, field, value)
-        instance.save()
-        return instance
+from .models import CommodityListing, ListingImage
 
 
 class ListingImageSerializer(serializers.ModelSerializer):

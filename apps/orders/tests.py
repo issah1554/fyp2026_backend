@@ -4,8 +4,9 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.auth.models import Profile
+from apps.areas.models import AdmArea
 from apps.commodities.models import Commodity
-from apps.listings.models import AdmArea, CommodityListing
+from apps.listings.models import CommodityListing
 from .models import Order
 
 

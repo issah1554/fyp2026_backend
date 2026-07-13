@@ -4,8 +4,9 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.auth.models import Profile
+from apps.areas.models import AdmArea
 from apps.commodities.models import Commodity, CommodityCategory
-from .models import AdmArea, CommodityListing, ListingImage
+from .models import CommodityListing, ListingImage
 
 
 class ListingsApiTests(APITestCase):
@@ -37,82 +38,6 @@ class ListingsApiTests(APITestCase):
         self.category = CommodityCategory.objects.create(name="Cereals", description="Grain Crops")
         self.commodity = Commodity.objects.create(name="Maize", unit="kg", description="Dry Maize")
         self.commodity.categories.add(self.category)
-
-    def test_admin_can_create_and_list_adm_areas(self):
-        self.client.force_authenticate(self.admin)
-        
-        # Create parent area
-        create_response = self.client.post(
-            "/api/v1/areas/",
-            {
-                "name": "Dar es Salaam",
-                "level": "region",
-            },
-            format="json",
-        )
-        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
-        self.assertTrue(create_response.data["success"])
-        parent_id = create_response.data["data"]["area_id"]
-        
-        # Create child area
-        child_response = self.client.post(
-            "/api/v1/areas/",
-            {
-                "name": "Kinondoni",
-                "level": "district",
-                "parent_id": parent_id,
-            },
-            format="json",
-        )
-        self.assertEqual(child_response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(child_response.data["data"]["parent"]["name"], "Dar es Salaam")
-
-        # List areas
-        list_response = self.client.get("/api/v1/areas/")
-        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
-        self.assertGreaterEqual(len(list_response.data["data"]), 2)
-
-    def test_farmer_cannot_create_adm_areas(self):
-        self.client.force_authenticate(self.farmer)
-        create_response = self.client.post(
-            "/api/v1/areas/",
-            {
-                "name": "Tanga",
-                "level": "region",
-            },
-            format="json",
-        )
-        self.assertEqual(create_response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_unauthenticated_can_list_adm_areas(self):
-        AdmArea.objects.create(name="Public Region", level="region")
-        self.client.force_authenticate(user=None)
-        list_response = self.client.get("/api/v1/areas/")
-        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
-        self.assertTrue(list_response.data["success"])
-
-    def test_adm_areas_filtering(self):
-        parent_region = AdmArea.objects.create(name="Arusha", level="region")
-        child_district = AdmArea.objects.create(name="Meru", level="district", parent=parent_region)
-        
-        self.client.force_authenticate(user=None)
-        
-        # Test level filter
-        level_response = self.client.get("/api/v1/areas/", {"level": "region"})
-        self.assertEqual(level_response.status_code, status.HTTP_200_OK)
-        self.assertTrue(any(x["name"] == "Arusha" for x in level_response.data["data"]))
-        
-        # Test search filter
-        search_response = self.client.get("/api/v1/areas/", {"search": "eru"})
-        self.assertEqual(search_response.status_code, status.HTTP_200_OK)
-        self.assertTrue(any(x["name"] == "Meru" for x in search_response.data["data"]))
-        self.assertFalse(any(x["name"] == "Arusha" for x in search_response.data["data"]))
-        
-        # Test parent_id filter
-        parent_response = self.client.get("/api/v1/areas/", {"parent_id": parent_region.public_id})
-        self.assertEqual(parent_response.status_code, status.HTTP_200_OK)
-        self.assertTrue(any(x["name"] == "Meru" for x in parent_response.data["data"]))
-        self.assertFalse(any(x["name"] == "Arusha" for x in parent_response.data["data"]))
 
     def test_farmer_can_create_and_manage_listings(self):
         # Create area first as admin
