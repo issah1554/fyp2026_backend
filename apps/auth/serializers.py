@@ -86,6 +86,12 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 class AuthTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
+        username = attrs.get(self.username_field)
+        if username and "@" in username:
+            user = User.objects.filter(email__iexact=username).first()
+            if user is not None:
+                attrs[self.username_field] = getattr(user, self.username_field)
+
         data = super().validate(attrs)
         profile, _created = Profile.objects.get_or_create(user=self.user)
         if not profile.is_email_verified:

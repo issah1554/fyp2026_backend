@@ -160,6 +160,24 @@ class AuthApiTests(APITestCase):
         self.assertEqual(me_response.data["data"]["username"], "marketofficer")
         self.assertEqual(me_response.data["data"]["user_id"], user.profile.public_id)
 
+    def test_user_can_login_with_email(self):
+        user = get_user_model().objects.create_user(
+            username="marketofficer",
+            email="officer@example.com",
+            password="StrongPass123",
+        )
+        Profile.objects.create(user=user, email_verified_at=timezone.now())
+
+        response = self.client.post(
+            "/api/v1/auth/login/",
+            {"username": "officer@example.com", "password": "StrongPass123"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["success"])
+        self.assertEqual(response.data["data"]["user"]["username"], "marketofficer")
+
     def test_user_can_resend_email_verification(self):
         get_user_model().objects.create_user(
             username="amina",
