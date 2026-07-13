@@ -109,6 +109,18 @@ class AuthApiTests(APITestCase):
         self.assertFalse(response.data["success"])
         self.assertEqual(response.data["message"], "Email address is not verified.")
 
+    def test_invalid_login_uses_generic_invalid_credentials_message(self):
+        response = self.client.post(
+            "/api/v1/auth/login/",
+            {"username": "missing", "password": "wrong"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertFalse(response.data["success"])
+        self.assertEqual(response.data["message"], "Invalid credentials")
+        self.assertEqual(response.data["errors"], {})
+
     def test_user_can_login_refresh_and_get_profile(self):
         user = get_user_model().objects.create_user(
             username="marketofficer",

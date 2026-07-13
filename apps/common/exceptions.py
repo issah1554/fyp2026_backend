@@ -3,6 +3,8 @@ from rest_framework.views import exception_handler
 
 from .responses import error_payload
 
+INVALID_CREDENTIALS_DETAIL = "No active account found with the given credentials"
+
 
 def api_exception_handler(exc, context):
     response = exception_handler(exc, context)
@@ -18,6 +20,8 @@ def api_exception_handler(exc, context):
     if isinstance(response.data, dict):
         if set(response.data.keys()) == {"detail"}:
             message = str(response.data["detail"])
+            if message == INVALID_CREDENTIALS_DETAIL:
+                message = "Invalid credentials"
         else:
             message = "Validation failed." if response.status_code == status.HTTP_400_BAD_REQUEST else message
             errors = response.data
