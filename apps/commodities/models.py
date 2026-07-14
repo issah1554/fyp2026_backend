@@ -25,10 +25,40 @@ class CommodityCategory(models.Model):
         return self.name
 
 
+class CommodityUnit(models.Model):
+    public_id = models.CharField(max_length=10, unique=True, editable=False)
+    name = models.CharField(max_length=150, unique=True)
+    symbol = models.CharField(max_length=30, unique=True)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "commodity_units"
+        ordering = ["name"]
+        verbose_name_plural = "commodity units"
+
+    def save(self, *args, **kwargs):
+        if not self.public_id:
+            self.public_id = generate_unique_public_id(CommodityUnit)
+            if kwargs.get("update_fields") is not None:
+                kwargs["update_fields"] = set(kwargs["update_fields"]) | {"public_id"}
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.name} ({self.symbol})"
+
+
 class Commodity(models.Model):
     public_id = models.CharField(max_length=10, unique=True, editable=False)
     name = models.CharField(max_length=150)
     unit = models.CharField(max_length=50, blank=True)
+    unit_ref = models.ForeignKey(
+        CommodityUnit,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="commodities",
+    )
     description = models.TextField(blank=True)
     categories = models.ManyToManyField(
         CommodityCategory,

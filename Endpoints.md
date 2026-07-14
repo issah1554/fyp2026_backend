@@ -42,12 +42,22 @@ Status values:
 | PATCH | `/api/v1/commodities/categories/{category_id}/` | Update commodity category by public ID. | Admin bearer token | Working |
 | DELETE | `/api/v1/commodities/categories/{category_id}/` | Delete commodity category by public ID. | Admin bearer token | Working |
 
+## Commodity Units
+
+| Method | Path | Notes | Auth | Status |
+| --- | --- | --- | --- | --- |
+| GET | `/api/v1/commodities/units/` | List commodity measurement units such as Kilogram, Tonne, Crate, and Bag. | Bearer token | Working |
+| POST | `/api/v1/commodities/units/` | Create commodity unit with `name`, `symbol`, and optional `description`. | Admin bearer token | Working |
+| GET | `/api/v1/commodities/units/{unit_id}/` | Get commodity unit by public ID. | Bearer token | Working |
+| PATCH | `/api/v1/commodities/units/{unit_id}/` | Update commodity unit by public ID. | Admin bearer token | Working |
+| DELETE | `/api/v1/commodities/units/{unit_id}/` | Delete commodity unit by public ID. Linked commodities keep their stored unit symbol. | Admin bearer token | Working |
+
 ## Commodities
 
 | Method | Path | Notes | Auth | Status |
 | --- | --- | --- | --- | --- |
-| GET | `/api/v1/commodities/` | List commodities. | Bearer token | Working |
-| POST | `/api/v1/commodities/` | Create commodity. | Admin bearer token | Working |
+| GET | `/api/v1/commodities/` | List commodities. Supports `search`, `category_id`, `page`, and `page_size`. | Bearer token | Working |
+| POST | `/api/v1/commodities/` | Create commodity. Accepts optional `unit_id` and `category_ids`. | Admin bearer token | Working |
 | GET | `/api/v1/commodities/{commodity_id}/` | Get commodity by public ID. | Bearer token | Working |
 | PATCH | `/api/v1/commodities/{commodity_id}/` | Update commodity by public ID. | Admin bearer token | Working |
 | DELETE | `/api/v1/commodities/{commodity_id}/` | Delete commodity by public ID. | Admin bearer token | Working |
