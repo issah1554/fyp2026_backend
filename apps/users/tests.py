@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.auth.models import Profile
+from apps.users.models import Permission, RolePermission
 
 
 class UserAdminApiTests(APITestCase):
@@ -133,3 +134,45 @@ class UserAdminApiTests(APITestCase):
         self.assertEqual(search_response.status_code, status.HTTP_200_OK)
         self.assertEqual(search_response.data["meta"]["pagination"]["total_items"], 1)
         self.assertEqual(search_response.data["data"][0]["username"], "buyer_search")
+
+    def test_permissions_are_system_seeded_read_only_and_assignable_to_roles(self):
+        permission = Permission.objects.get(code="users.list")
+        list_response = self.client.get("/api/v1/users/permissions/")
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(any(item["code"] == "users.list" for item in list_response.data["data"]))
+
+        create_response = self.client.post(
+            "/api/v1/users/permissions/",
+            {"code": "custom.permission", "name": "Custom permission"},
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+        role_response = self.client.patch(
+            "/api/v1/users/roles/admin/",
+            {"permission_ids": [permission.public_id]},
+            format="json",
+        )
+        self.assertEqual(role_response.status_code, status.HTTP_200_OK)
+        self.assertIn(permission.public_id, role_response.data["data"]["permission_ids"])
+        self.assertTrue(RolePermission.objects.filter(role=Profile.Role.ADMIN, permission=permission).exists())
+
+        update_response = self.client.patch(
+            f"/api/v1/users/permissions/{permission.public_id}/",
+            {"name": "List managed users"},
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+        delete_response = self.client.delete(f"/api/v1/users/permissions/{permission.public_id}/")
+        self.assertEqual(delete_response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        self.assertTrue(Permission.objects.filter(pk=permission.pk).exists())
+
+    def test_role_assignment_rejects_unknown_permission(self):
+        response = self.client.patch(
+            "/api/v1/users/roles/admin/",
+            {"permission_ids": ["missing1234"]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(response.data["success"])

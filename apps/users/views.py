@@ -10,7 +10,15 @@ from apps.auth.models import Profile
 from apps.common.responses import collection_response, error_response, mutation_response, success_response
 
 from .permissions import IsUserAdmin
-from .serializers import ManagedUserCreateSerializer, ManagedUserSerializer, ManagedUserUpdateSerializer
+from .models import Permission, RolePermission
+from .serializers import (
+    ManagedUserCreateSerializer,
+    ManagedUserSerializer,
+    ManagedUserUpdateSerializer,
+    PermissionSerializer,
+    RolePermissionUpdateSerializer,
+    RoleSerializer,
+)
 
 User = get_user_model()
 
@@ -142,3 +150,66 @@ class UserDetailView(UserAdminMixin, APIView):
             )
         user.delete()
         return mutation_response(message="User deleted successfully.", status_code=status.HTTP_200_OK)
+
+
+def role_choices():
+    return [{"value": value, "label": label} for value, label in Profile.Role.choices]
+
+
+@extend_schema(tags=["Roles"])
+class RoleListView(UserAdminMixin, APIView):
+    @extend_schema(responses={200: RoleSerializer(many=True)})
+    def get(self, request):
+        return collection_response(RoleSerializer(role_choices(), many=True).data)
+
+
+@extend_schema(tags=["Roles"])
+class RoleDetailView(UserAdminMixin, APIView):
+    @extend_schema(responses={200: RoleSerializer})
+    def get(self, request, role_id):
+        role = next((role for role in role_choices() if role["value"] == role_id), None)
+        if role is None:
+            return error_response(message="Role not found.", status_code=status.HTTP_404_NOT_FOUND)
+        return success_response(RoleSerializer(role).data)
+
+    @extend_schema(request=RolePermissionUpdateSerializer, responses={200: RoleSerializer})
+    def patch(self, request, role_id):
+        role = next((role for role in role_choices() if role["value"] == role_id), None)
+        if role is None:
+            return error_response(message="Role not found.", status_code=status.HTTP_404_NOT_FOUND)
+
+        serializer = RolePermissionUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        permissions = Permission.objects.filter(public_id__in=serializer.validated_data["permission_ids"])
+
+        RolePermission.objects.filter(role=role_id).delete()
+        RolePermission.objects.bulk_create(
+            [RolePermission(role=role_id, permission=permission) for permission in permissions],
+            ignore_conflicts=True,
+        )
+        return mutation_response(
+            message="Role permissions updated successfully.",
+            data=RoleSerializer(role).data,
+            status_code=status.HTTP_200_OK,
+        )
+
+
+@extend_schema(tags=["Permissions"])
+class PermissionListCreateView(UserAdminMixin, APIView):
+    @extend_schema(responses={200: PermissionSerializer(many=True)})
+    def get(self, request):
+        permissions = Permission.objects.all()
+        search = request.query_params.get("search")
+        if search:
+            permissions = permissions.filter(Q(code__icontains=search) | Q(name__icontains=search))
+        return collection_response(PermissionSerializer(permissions, many=True).data)
+
+
+@extend_schema(tags=["Permissions"])
+class PermissionDetailView(UserAdminMixin, APIView):
+    def get_permission(self, permission_id):
+        return get_object_or_404(Permission.objects.all(), public_id=permission_id)
+
+    @extend_schema(responses={200: PermissionSerializer, 404: OpenApiResponse(description="Permission not found.")})
+    def get(self, request, permission_id):
+        return success_response(PermissionSerializer(self.get_permission(permission_id)).data)

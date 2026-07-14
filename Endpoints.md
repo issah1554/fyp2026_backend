@@ -32,6 +32,16 @@ Status values:
 | PATCH | `/api/v1/users/{user_id}/` | Update managed user by public ID. | Admin bearer token | Working |
 | DELETE | `/api/v1/users/{user_id}/` | Delete managed user by public ID. | Admin bearer token | Working |
 
+## Roles and Permissions
+
+| Method | Path | Notes | Auth | Status |
+| --- | --- | --- | --- | --- |
+| GET | `/api/v1/users/roles/` | List system roles and assigned permissions. | Admin bearer token | Working |
+| GET | `/api/v1/users/roles/{role_id}/` | Get system role by role code. | Admin bearer token | Working |
+| PATCH | `/api/v1/users/roles/{role_id}/` | Replace permissions assigned to a role using `permission_ids`. | Admin bearer token | Working |
+| GET | `/api/v1/users/permissions/` | List read-only system-defined permissions. Supports `search`. | Admin bearer token | Working |
+| GET | `/api/v1/users/permissions/{permission_id}/` | Get system permission by public ID. | Admin bearer token | Working |
+
 ## Commodity Categories
 
 | Method | Path | Notes | Auth | Status |

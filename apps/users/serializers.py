@@ -6,6 +6,8 @@ from rest_framework import serializers
 
 from apps.auth.models import Profile
 
+from .models import Permission, RolePermission
+
 User = get_user_model()
 
 
@@ -168,3 +170,39 @@ class ManagedUserUpdateSerializer(serializers.ModelSerializer):
             profile.save(update_fields=profile_update_fields)
 
         return instance
+
+
+class PermissionSerializer(serializers.ModelSerializer):
+    permission_id = serializers.CharField(source="public_id", read_only=True)
+
+    class Meta:
+        model = Permission
+        fields = ["permission_id", "code", "name", "description", "created_at"]
+        read_only_fields = ["permission_id", "created_at"]
+
+
+class RoleSerializer(serializers.Serializer):
+    role_id = serializers.CharField(source="value")
+    name = serializers.CharField(source="label")
+    permission_ids = serializers.SerializerMethodField()
+    permissions = serializers.SerializerMethodField()
+
+    def get_permission_ids(self, role):
+        return list(
+            RolePermission.objects.filter(role=role["value"]).values_list("permission__public_id", flat=True)
+        )
+
+    def get_permissions(self, role):
+        permissions = Permission.objects.filter(role_links__role=role["value"]).distinct()
+        return PermissionSerializer(permissions, many=True).data
+
+
+class RolePermissionUpdateSerializer(serializers.Serializer):
+    permission_ids = serializers.ListField(child=serializers.CharField(), allow_empty=True)
+
+    def validate_permission_ids(self, value):
+        existing_ids = set(Permission.objects.filter(public_id__in=value).values_list("public_id", flat=True))
+        missing_ids = sorted(set(value) - existing_ids)
+        if missing_ids:
+            raise serializers.ValidationError(f"Unknown permission_id value(s): {', '.join(missing_ids)}")
+        return value
