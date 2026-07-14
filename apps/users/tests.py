@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.auth.models import Profile
-from apps.users.models import Permission, RolePermission
+from apps.users.models import Permission, Role, RolePermission
 
 
 class UserAdminApiTests(APITestCase):
@@ -155,7 +155,8 @@ class UserAdminApiTests(APITestCase):
         )
         self.assertEqual(role_response.status_code, status.HTTP_200_OK)
         self.assertIn(permission.public_id, role_response.data["data"]["permission_ids"])
-        self.assertTrue(RolePermission.objects.filter(role=Profile.Role.ADMIN, permission=permission).exists())
+        admin_role = Role.objects.get(code=Profile.Role.ADMIN)
+        self.assertTrue(RolePermission.objects.filter(role=admin_role, permission=permission).exists())
 
         update_response = self.client.patch(
             f"/api/v1/users/permissions/{permission.public_id}/",
@@ -176,3 +177,39 @@ class UserAdminApiTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertFalse(response.data["success"])
+
+    def test_admin_can_create_update_and_delete_custom_role(self):
+        permission = Permission.objects.get(code="users.list")
+        create_response = self.client.post(
+            "/api/v1/users/roles/",
+            {
+                "code": "auditor",
+                "name": "Auditor",
+                "description": "Read-only audit role.",
+                "permission_ids": [permission.public_id],
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        role_id = create_response.data["data"]["role_id"]
+        self.assertFalse(create_response.data["data"]["is_system"])
+        self.assertIn(permission.public_id, create_response.data["data"]["permission_ids"])
+
+        update_response = self.client.put(
+            f"/api/v1/users/roles/{role_id}/",
+            {"code": "auditor", "name": "Audit Reviewer", "description": "", "permission_ids": []},
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(update_response.data["data"]["name"], "Audit Reviewer")
+        self.assertEqual(update_response.data["data"]["permission_ids"], [])
+
+        delete_response = self.client.delete(f"/api/v1/users/roles/{role_id}/")
+        self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
+        self.assertFalse(Role.objects.filter(public_id=role_id).exists())
+
+    def test_system_roles_cannot_be_deleted(self):
+        admin_role = Role.objects.get(code=Profile.Role.ADMIN)
+        response = self.client.delete(f"/api/v1/users/roles/{admin_role.public_id}/")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(Role.objects.filter(pk=admin_role.pk).exists())

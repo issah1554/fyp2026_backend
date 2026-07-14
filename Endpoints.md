@@ -36,9 +36,12 @@ Status values:
 
 | Method | Path | Notes | Auth | Status |
 | --- | --- | --- | --- | --- |
-| GET | `/api/v1/users/roles/` | List system roles and assigned permissions. | Admin bearer token | Working |
-| GET | `/api/v1/users/roles/{role_id}/` | Get system role by role code. | Admin bearer token | Working |
+| GET | `/api/v1/users/roles/` | List roles and assigned permissions. | Admin bearer token | Working |
+| POST | `/api/v1/users/roles/` | Create custom role with optional `permission_ids`. | Admin bearer token | Working |
+| GET | `/api/v1/users/roles/{role_id}/` | Get role by public ID or code. | Admin bearer token | Working |
+| PUT | `/api/v1/users/roles/{role_id}/` | Update role metadata and optional `permission_ids`. System role codes cannot be changed. | Admin bearer token | Working |
 | PATCH | `/api/v1/users/roles/{role_id}/` | Replace permissions assigned to a role using `permission_ids`. | Admin bearer token | Working |
+| DELETE | `/api/v1/users/roles/{role_id}/` | Delete custom role. System roles and roles assigned to users cannot be deleted. | Admin bearer token | Working |
 | GET | `/api/v1/users/permissions/` | List read-only system-defined permissions. Supports `search`. | Admin bearer token | Working |
 | GET | `/api/v1/users/permissions/{permission_id}/` | Get system permission by public ID. | Admin bearer token | Working |
 

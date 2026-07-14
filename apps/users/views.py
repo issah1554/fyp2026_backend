@@ -10,12 +10,13 @@ from apps.auth.models import Profile
 from apps.common.responses import collection_response, error_response, mutation_response, success_response
 
 from .permissions import IsUserAdmin
-from .models import Permission, RolePermission
+from .models import Permission, Role, RolePermission
 from .serializers import (
     ManagedUserCreateSerializer,
     ManagedUserSerializer,
     ManagedUserUpdateSerializer,
     PermissionSerializer,
+    RoleCreateUpdateSerializer,
     RolePermissionUpdateSerializer,
     RoleSerializer,
 )
@@ -148,43 +149,54 @@ class UserDetailView(UserAdminMixin, APIView):
                 message="You cannot delete your own account.",
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
+        profile, _created = Profile.objects.get_or_create(user=user)
+        if profile.role == Profile.Role.ADMIN and Profile.objects.filter(role=Profile.Role.ADMIN, user__is_active=True).count() <= 1:
+            return error_response(
+                message="At least one active admin must remain in the system.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
         user.delete()
         return mutation_response(message="User deleted successfully.", status_code=status.HTTP_200_OK)
 
 
-def role_choices():
-    return [{"value": value, "label": label} for value, label in Profile.Role.choices]
-
-
 @extend_schema(tags=["Roles"])
-class RoleListView(UserAdminMixin, APIView):
+class RoleListCreateView(UserAdminMixin, APIView):
     @extend_schema(responses={200: RoleSerializer(many=True)})
     def get(self, request):
-        return collection_response(RoleSerializer(role_choices(), many=True).data)
+        return collection_response(RoleSerializer(Role.objects.all(), many=True).data)
+
+    @extend_schema(request=RoleCreateUpdateSerializer, responses={201: RoleSerializer})
+    def post(self, request):
+        serializer = RoleCreateUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        role = serializer.save()
+        return mutation_response(
+            message="Role created successfully.",
+            data=RoleSerializer(role).data,
+            status_code=status.HTTP_201_CREATED,
+        )
 
 
 @extend_schema(tags=["Roles"])
 class RoleDetailView(UserAdminMixin, APIView):
+    def get_role(self, role_id):
+        return get_object_or_404(Role.objects.all(), Q(public_id=role_id) | Q(code=role_id))
+
     @extend_schema(responses={200: RoleSerializer})
     def get(self, request, role_id):
-        role = next((role for role in role_choices() if role["value"] == role_id), None)
-        if role is None:
-            return error_response(message="Role not found.", status_code=status.HTTP_404_NOT_FOUND)
-        return success_response(RoleSerializer(role).data)
+        return success_response(RoleSerializer(self.get_role(role_id)).data)
 
     @extend_schema(request=RolePermissionUpdateSerializer, responses={200: RoleSerializer})
     def patch(self, request, role_id):
-        role = next((role for role in role_choices() if role["value"] == role_id), None)
-        if role is None:
-            return error_response(message="Role not found.", status_code=status.HTTP_404_NOT_FOUND)
+        role = self.get_role(role_id)
 
         serializer = RolePermissionUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         permissions = Permission.objects.filter(public_id__in=serializer.validated_data["permission_ids"])
 
-        RolePermission.objects.filter(role=role_id).delete()
+        RolePermission.objects.filter(role=role).delete()
         RolePermission.objects.bulk_create(
-            [RolePermission(role=role_id, permission=permission) for permission in permissions],
+            [RolePermission(role=role, permission=permission) for permission in permissions],
             ignore_conflicts=True,
         )
         return mutation_response(
@@ -192,6 +204,32 @@ class RoleDetailView(UserAdminMixin, APIView):
             data=RoleSerializer(role).data,
             status_code=status.HTTP_200_OK,
         )
+
+    @extend_schema(request=RoleCreateUpdateSerializer, responses={200: RoleSerializer})
+    def put(self, request, role_id):
+        role = self.get_role(role_id)
+        if role.is_system and request.data.get("code") and request.data.get("code") != role.code:
+            return error_response(message="System role codes cannot be changed.", status_code=status.HTTP_400_BAD_REQUEST)
+        serializer = RoleCreateUpdateSerializer(role, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        role = serializer.save()
+        return mutation_response(
+            message="Role updated successfully.",
+            data=RoleSerializer(role).data,
+            status_code=status.HTTP_200_OK,
+        )
+
+    @extend_schema(responses={200: OpenApiResponse(description="Role deleted.")})
+    def delete(self, request, role_id):
+        role = self.get_role(role_id)
+        if role.is_system:
+            return error_response(message="System roles cannot be deleted.", status_code=status.HTTP_400_BAD_REQUEST)
+        if role.code == Profile.Role.ADMIN and Profile.objects.filter(role=Profile.Role.ADMIN).count() <= 1:
+            return error_response(message="At least one admin must remain in the system.", status_code=status.HTTP_400_BAD_REQUEST)
+        if Profile.objects.filter(role=role.code).exists():
+            return error_response(message="Cannot delete a role assigned to users.", status_code=status.HTTP_400_BAD_REQUEST)
+        role.delete()
+        return mutation_response(message="Role deleted successfully.", status_code=status.HTTP_200_OK)
 
 
 @extend_schema(tags=["Permissions"])

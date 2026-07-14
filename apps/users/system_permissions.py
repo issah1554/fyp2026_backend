@@ -38,3 +38,67 @@ SYSTEM_PERMISSIONS = [
     ("orders.read", "Read orders", "Read order details."),
     ("orders.update", "Update orders", "Update orders."),
 ]
+
+SYSTEM_ROLES = [
+    ("admin", "Administrator", "Full system administration role.", True),
+    ("farmer", "Farmer", "Commodity producer role.", True),
+    ("entrepreneur", "Entrepreneur", "Trading and selling role.", True),
+    ("buyer", "Buyer", "Commodity purchasing role.", True),
+    ("market_officer", "Market Officer", "Market data collection and validation role.", True),
+    ("researcher", "Researcher", "Read-oriented analysis role.", True),
+]
+
+DEFAULT_ROLE_PERMISSIONS = {
+    "admin": [code for code, _name, _description in SYSTEM_PERMISSIONS],
+    "farmer": [
+        "auth.me",
+        "auth.logout",
+        "commodities.list",
+        "commodities.read",
+        "areas.create",
+        "listings.create",
+        "listings.update",
+        "listings.delete",
+        "orders.list",
+        "orders.read",
+        "orders.update",
+    ],
+    "entrepreneur": [
+        "auth.me",
+        "auth.logout",
+        "commodities.list",
+        "commodities.read",
+        "listings.create",
+        "listings.update",
+        "listings.delete",
+        "orders.list",
+        "orders.read",
+        "orders.update",
+    ],
+    "buyer": [
+        "auth.me",
+        "auth.logout",
+        "commodities.list",
+        "commodities.read",
+        "orders.create",
+        "orders.list",
+        "orders.read",
+    ],
+    "market_officer": [
+        "auth.me",
+        "auth.logout",
+        "commodities.list",
+        "commodities.read",
+        "areas.create",
+        "areas.bulk_import",
+        "areas.update",
+    ],
+    "researcher": [
+        "auth.me",
+        "auth.logout",
+        "commodities.list",
+        "commodities.read",
+        "orders.list",
+        "orders.read",
+    ],
+}
