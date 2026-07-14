@@ -97,3 +97,39 @@ class UserAdminApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertFalse(response.data["success"])
+
+    def test_user_list_is_paginated_with_totals_and_filters(self):
+        for index in range(12):
+            user = get_user_model().objects.create_user(
+                username=f"farmer{index:02d}",
+                email=f"farmer{index:02d}@example.com",
+                password="StrongPass123",
+                is_active=index % 2 == 0,
+            )
+            Profile.objects.create(user=user, role=Profile.Role.FARMER)
+
+        buyer = get_user_model().objects.create_user(
+            username="buyer_search",
+            email="buyer-search@example.com",
+            password="StrongPass123",
+        )
+        Profile.objects.create(user=buyer, role=Profile.Role.BUYER, organization="Search Org")
+
+        response = self.client.get("/api/v1/users/", {"page": 2, "page_size": 5})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["data"]), 5)
+        self.assertEqual(response.data["meta"]["pagination"]["page"], 2)
+        self.assertEqual(response.data["meta"]["pagination"]["page_size"], 5)
+        self.assertEqual(response.data["meta"]["pagination"]["total_items"], 14)
+        self.assertEqual(response.data["meta"]["totals"]["total"], 14)
+        self.assertEqual(response.data["meta"]["totals"]["admins"], 1)
+
+        role_response = self.client.get("/api/v1/users/", {"role": "buyer"})
+        self.assertEqual(role_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(any(x["username"] == "buyer_search" for x in role_response.data["data"]))
+        self.assertFalse(any(x["profile"]["role"] == "farmer" for x in role_response.data["data"]))
+
+        search_response = self.client.get("/api/v1/users/", {"search": "Search Org"})
+        self.assertEqual(search_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(search_response.data["meta"]["pagination"]["total_items"], 1)
+        self.assertEqual(search_response.data["data"][0]["username"], "buyer_search")
