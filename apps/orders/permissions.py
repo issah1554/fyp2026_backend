@@ -14,7 +14,7 @@ class IsOrderParticipant(BasePermission):
         if user.is_staff or user.is_superuser:
             return True
         try:
-            if user.profile.role == Profile.Role.ADMIN:
+            if user.profile.role.code == Profile.Role.ADMIN:
                 return True
         except Profile.DoesNotExist:
             pass

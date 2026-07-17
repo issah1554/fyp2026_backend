@@ -15,6 +15,6 @@ class IsAdminOrReadOnly(BasePermission):
         if user.is_staff or user.is_superuser:
             return True
         try:
-            return user.profile.role == Profile.Role.ADMIN
+            return user.profile.role.code == Profile.Role.ADMIN
         except Profile.DoesNotExist:
             return False

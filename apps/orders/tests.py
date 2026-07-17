@@ -7,6 +7,7 @@ from apps.auth.models import Profile
 from apps.areas.models import AdmArea
 from apps.commodities.models import Commodity
 from apps.listings.models import CommodityListing
+from apps.users.models import Role
 from .models import Order
 
 
@@ -20,7 +21,7 @@ class OrdersApiTests(APITestCase):
         )
         Profile.objects.create(
             user=self.farmer,
-            role=Profile.Role.FARMER,
+            role=Role.objects.get(code=Profile.Role.FARMER),
             email_verified_at=timezone.now(),
         )
 
@@ -31,7 +32,7 @@ class OrdersApiTests(APITestCase):
         )
         Profile.objects.create(
             user=self.buyer,
-            role=Profile.Role.BUYER,
+            role=Role.objects.get(code=Profile.Role.BUYER),
             email_verified_at=timezone.now(),
         )
 
@@ -42,7 +43,7 @@ class OrdersApiTests(APITestCase):
         )
         Profile.objects.create(
             user=self.other_user,
-            role=Profile.Role.BUYER,
+            role=Role.objects.get(code=Profile.Role.BUYER),
             email_verified_at=timezone.now(),
         )
 

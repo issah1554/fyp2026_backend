@@ -16,7 +16,7 @@ class UserAdminApiTests(APITestCase):
         )
         Profile.objects.create(
             user=self.admin,
-            role=Profile.Role.ADMIN,
+            role=Role.objects.get(code=Profile.Role.ADMIN),
             email_verified_at=timezone.now(),
         )
         self.client.force_authenticate(self.admin)
@@ -55,7 +55,7 @@ class UserAdminApiTests(APITestCase):
             email="farmer1@example.com",
             password="StrongPass123",
         )
-        profile = Profile.objects.create(user=user, role=Profile.Role.FARMER)
+        profile = Profile.objects.create(user=user, role=Role.objects.get(code=Profile.Role.FARMER))
 
         detail_response = self.client.get(f"/api/v1/users/{profile.public_id}/")
         self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
@@ -81,7 +81,7 @@ class UserAdminApiTests(APITestCase):
             email="farmer2@example.com",
             password="StrongPass123",
         )
-        Profile.objects.create(user=user, role=Profile.Role.FARMER)
+        Profile.objects.create(user=user, role=Role.objects.get(code=Profile.Role.FARMER))
         self.client.force_authenticate(user)
 
         response = self.client.get("/api/v1/users/")
@@ -107,14 +107,14 @@ class UserAdminApiTests(APITestCase):
                 password="StrongPass123",
                 is_active=index % 2 == 0,
             )
-            Profile.objects.create(user=user, role=Profile.Role.FARMER)
+            Profile.objects.create(user=user, role=Role.objects.get(code=Profile.Role.FARMER))
 
         buyer = get_user_model().objects.create_user(
             username="buyer_search",
             email="buyer-search@example.com",
             password="StrongPass123",
         )
-        Profile.objects.create(user=buyer, role=Profile.Role.BUYER, organization="Search Org")
+        Profile.objects.create(user=buyer, role=Role.objects.get(code=Profile.Role.BUYER), organization="Search Org")
 
         response = self.client.get("/api/v1/users/", {"page": 2, "page_size": 5})
         self.assertEqual(response.status_code, status.HTTP_200_OK)

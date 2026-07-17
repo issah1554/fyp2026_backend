@@ -23,8 +23,8 @@ class OrderMixin:
             return Order.objects.select_related("listing__commodity", "listing__adm_area", "user__profile").all()
             
         try:
-            if user.profile.role == Profile.Role.ADMIN:
-                return Order.objects.select_related("listing__commodity", "listing__adm_area", "user__profile").all()
+            if user.profile.role.code == Profile.Role.ADMIN:
+                return Order.objects.select_related("listing__commodity", "listing__adm_area", "user__profile", "user__profile__role").all()
         except Profile.DoesNotExist:
             pass
 

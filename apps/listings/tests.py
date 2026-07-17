@@ -6,6 +6,7 @@ from rest_framework.test import APITestCase
 from apps.auth.models import Profile
 from apps.areas.models import AdmArea
 from apps.commodities.models import Commodity, CommodityCategory
+from apps.users.models import Role
 from .models import CommodityListing, ListingImage
 
 
@@ -19,7 +20,7 @@ class ListingsApiTests(APITestCase):
         )
         Profile.objects.create(
             user=self.admin,
-            role=Profile.Role.ADMIN,
+            role=Role.objects.get(code=Profile.Role.ADMIN),
             email_verified_at=timezone.now(),
         )
 
@@ -30,7 +31,7 @@ class ListingsApiTests(APITestCase):
         )
         Profile.objects.create(
             user=self.farmer,
-            role=Profile.Role.FARMER,
+            role=Role.objects.get(code=Profile.Role.FARMER),
             email_verified_at=timezone.now(),
         )
 

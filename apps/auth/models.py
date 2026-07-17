@@ -5,6 +5,21 @@ from django.utils import timezone
 from apps.common.ids import generate_unique_public_id
 
 
+def get_default_role_id():
+    from apps.users.models import Role
+
+    role, _created = Role.objects.get_or_create(
+        code=Profile.Role.FARMER,
+        defaults={
+            "public_id": generate_unique_public_id(Role),
+            "name": "Farmer",
+            "description": "Commodity producer role.",
+            "is_system": True,
+        },
+    )
+    return role.pk
+
+
 class Profile(models.Model):
     class Role(models.TextChoices):
         FARMER = "farmer", "Farmer"
@@ -20,10 +35,11 @@ class Profile(models.Model):
         related_name="profile",
     )
     public_id = models.CharField(max_length=10, unique=True, editable=False)
-    role = models.CharField(
-        max_length=32,
-        choices=Role.choices,
-        default=Role.FARMER,
+    role = models.ForeignKey(
+        "users.Role",
+        on_delete=models.PROTECT,
+        related_name="profiles",
+        default=get_default_role_id,
     )
     phone_number = models.CharField(max_length=32, blank=True)
     organization = models.CharField(max_length=120, blank=True)

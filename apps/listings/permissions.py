@@ -19,11 +19,11 @@ class IsSellerOrReadOnly(BasePermission):
         if user.is_staff or user.is_superuser:
             return True
         try:
-            if user.profile.role == Profile.Role.ADMIN:
+            if user.profile.role.code == Profile.Role.ADMIN:
                 return True
             # Create action: Only farmers and entrepreneurs (and admin)
             if request.method == "POST":
-                return user.profile.role in [Profile.Role.FARMER, Profile.Role.ENTREPRENEUR]
+                return user.profile.role.code in [Profile.Role.FARMER, Profile.Role.ENTREPRENEUR]
         except Profile.DoesNotExist:
             return False
             
@@ -36,7 +36,7 @@ class IsSellerOrReadOnly(BasePermission):
         if user.is_staff or user.is_superuser:
             return True
         try:
-            if user.profile.role == Profile.Role.ADMIN:
+            if user.profile.role.code == Profile.Role.ADMIN:
                 return True
         except Profile.DoesNotExist:
             pass

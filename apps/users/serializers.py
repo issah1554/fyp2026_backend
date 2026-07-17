@@ -11,8 +11,13 @@ from .models import Permission, Role, RolePermission
 User = get_user_model()
 
 
+def default_profile_role():
+    return Role.objects.get(code=Profile.Role.FARMER)
+
+
 class ManagedProfileSerializer(serializers.ModelSerializer):
     is_email_verified = serializers.BooleanField(read_only=True)
+    role = serializers.SlugRelatedField(slug_field="code", queryset=Role.objects.all())
 
     class Meta:
         model = Profile
@@ -60,7 +65,7 @@ class ManagedUserSerializer(serializers.ModelSerializer):
 
 class ManagedUserCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
-    role = serializers.CharField(default=Profile.Role.FARMER)
+    role = serializers.SlugRelatedField(slug_field="code", queryset=Role.objects.all(), default=default_profile_role)
     phone_number = serializers.CharField(required=False, allow_blank=True)
     organization = serializers.CharField(required=False, allow_blank=True)
 
@@ -89,11 +94,6 @@ class ManagedUserCreateSerializer(serializers.ModelSerializer):
         validate_password(value)
         return value
 
-    def validate_role(self, value):
-        if not Role.objects.filter(code=value).exists():
-            raise serializers.ValidationError(f"Role '{value}' does not exist.")
-        return value
-
     @transaction.atomic
     def create(self, validated_data):
         profile_data = {
@@ -110,7 +110,7 @@ class ManagedUserCreateSerializer(serializers.ModelSerializer):
 
 
 class ManagedUserUpdateSerializer(serializers.ModelSerializer):
-    role = serializers.CharField(required=False)
+    role = serializers.SlugRelatedField(slug_field="code", queryset=Role.objects.all(), required=False)
     phone_number = serializers.CharField(required=False, allow_blank=True)
     organization = serializers.CharField(required=False, allow_blank=True)
 
@@ -137,27 +137,24 @@ class ManagedUserUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("A user with this email already exists.")
         return value
 
-    def validate_role(self, value):
-        if not Role.objects.filter(code=value).exists():
-            raise serializers.ValidationError(f"Role '{value}' does not exist.")
-        return value
-
     def validate(self, attrs):
         request = self.context.get("request")
         current_profile, _created = Profile.objects.get_or_create(user=self.instance)
         next_role = attrs.get("role", current_profile.role)
+        next_role_code = next_role.code
+        current_role_code = current_profile.role.code
         next_is_active = attrs.get("is_active", self.instance.is_active)
-        removes_admin_role = current_profile.role == Profile.Role.ADMIN and next_role != Profile.Role.ADMIN
-        deactivates_admin = current_profile.role == Profile.Role.ADMIN and next_is_active is False
+        removes_admin_role = current_role_code == Profile.Role.ADMIN and next_role_code != Profile.Role.ADMIN
+        deactivates_admin = current_role_code == Profile.Role.ADMIN and next_is_active is False
 
-        if (removes_admin_role or deactivates_admin) and Profile.objects.filter(role=Profile.Role.ADMIN, user__is_active=True).count() <= 1:
+        if (removes_admin_role or deactivates_admin) and Profile.objects.filter(role__code=Profile.Role.ADMIN, user__is_active=True).count() <= 1:
             raise serializers.ValidationError("At least one active admin must remain in the system.")
 
         if request is None or self.instance != request.user:
             return attrs
 
         profile_role = attrs.get("role")
-        removes_own_admin_role = profile_role is not None and profile_role != Profile.Role.ADMIN
+        removes_own_admin_role = profile_role is not None and profile_role.code != Profile.Role.ADMIN
         removes_staff_access = attrs.get("is_staff") is False and request.user.is_staff
         removes_superuser_access = attrs.get("is_superuser") is False and request.user.is_superuser
 

@@ -7,12 +7,18 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from .models import EmailVerificationToken, PasswordResetToken, Profile
+from apps.users.models import Role
 
 User = get_user_model()
 
 
+def default_profile_role():
+    return Role.objects.get(code=Profile.Role.FARMER)
+
+
 class ProfileSerializer(serializers.ModelSerializer):
     is_email_verified = serializers.BooleanField(read_only=True)
+    role = serializers.SlugRelatedField(slug_field="code", queryset=Role.objects.all())
 
     class Meta:
         model = Profile
@@ -43,7 +49,7 @@ class UserSerializer(serializers.ModelSerializer):
 class RegisterSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(required=True)
     password = serializers.CharField(write_only=True, min_length=8)
-    role = serializers.ChoiceField(choices=Profile.Role.choices, default=Profile.Role.FARMER)
+    role = serializers.SlugRelatedField(slug_field="code", queryset=Role.objects.all(), default=default_profile_role)
     phone_number = serializers.CharField(required=False, allow_blank=True)
     organization = serializers.CharField(required=False, allow_blank=True)
 

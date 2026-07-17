@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.auth.models import Profile
+from apps.users.models import Role
 
 from .models import Commodity, CommodityCategory, CommodityUnit
 
@@ -17,7 +18,7 @@ class CommodityApiTests(APITestCase):
         )
         Profile.objects.create(
             user=self.admin,
-            role=Profile.Role.ADMIN,
+            role=Role.objects.get(code=Profile.Role.ADMIN),
             email_verified_at=timezone.now(),
         )
         self.client.force_authenticate(self.admin)
@@ -94,7 +95,7 @@ class CommodityApiTests(APITestCase):
             email="farmer@example.com",
             password="StrongPass123",
         )
-        Profile.objects.create(user=user, role=Profile.Role.FARMER)
+        Profile.objects.create(user=user, role=Role.objects.get(code=Profile.Role.FARMER))
         category = CommodityCategory.objects.create(name="Vegetables")
         commodity = Commodity.objects.create(name="Tomato", unit="crate")
         commodity.categories.add(category)
@@ -115,7 +116,7 @@ class CommodityApiTests(APITestCase):
             email="buyer@example.com",
             password="StrongPass123",
         )
-        Profile.objects.create(user=user, role=Profile.Role.BUYER)
+        Profile.objects.create(user=user, role=Role.objects.get(code=Profile.Role.BUYER))
         self.client.force_authenticate(user)
 
         response = self.client.post(
