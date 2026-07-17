@@ -162,6 +162,33 @@ Run tests without activating the virtualenv:
 .\venv\Scripts\python.exe manage.py test
 ```
 
+## Render Deployment
+
+The Django project module is `config`, so the Render web service Start Command must be:
+
+```bash
+gunicorn config.wsgi:application
+```
+
+Do not use `gunicorn project_name.wsgi:application`; `project_name` is only a placeholder and will fail with:
+
+```text
+ModuleNotFoundError: No module named 'project_name'
+```
+
+For a manual Render service, set these values in the Render dashboard:
+
+```text
+Build Command: pip install -r requirements.txt
+Start Command: gunicorn config.wsgi:application
+```
+
+Set `DEBUG=false` and include your Render service host in `ALLOWED_HOSTS`, for example:
+
+```text
+ALLOWED_HOSTS=your-service-name.onrender.com
+```
+
 ## Email
 
 Verification emails are sent through the SMTP settings in `.env`.
