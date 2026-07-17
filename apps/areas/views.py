@@ -72,16 +72,45 @@ def get_area_by_path(path):
     return area
 
 
-def create_area_path(path):
+def get_cached_area(area_cache, name, level, parent):
+    parent_id = parent.id if parent is not None else None
+    cache_key = (parent_id, level, name)
+    if cache_key not in area_cache:
+        area_cache[cache_key] = AdmArea.objects.filter(
+            name=name,
+            level=level,
+            parent=parent,
+        ).first()
+    return area_cache[cache_key]
+
+
+def get_area_by_path_cached(path, area_cache):
     parent = None
     area = None
 
     for index, name in enumerate(path):
+        area = get_cached_area(area_cache, name, AREA_PATH_LEVELS[index], parent)
+        if area is None:
+            return None
+        parent = area
+
+    return area
+
+
+def create_area_path(path, area_cache=None):
+    parent = None
+    area = None
+
+    for index, name in enumerate(path):
+        level = AREA_PATH_LEVELS[index]
         area, _created = AdmArea.objects.get_or_create(
             name=name,
-            level=AREA_PATH_LEVELS[index],
+            level=level,
             parent=parent,
         )
+        if area_cache is not None:
+            parent_id = parent.id if parent is not None else None
+            area_cache[(parent_id, level, name)] = area
         parent = area
 
     return area
@@ -165,13 +194,14 @@ class AdmAreaBulkCreateView(AdmAreaMixin, APIView):
         serializer.is_valid(raise_exception=True)
 
         sync_adm_area_id_sequence()
+        area_cache = {}
         created = []
         skipped = []
         failed = []
 
         for index, item in enumerate(serializer.validated_data):
             path = item["path"]
-            existing = get_area_by_path(path)
+            existing = get_area_by_path_cached(path, area_cache)
             if existing is not None:
                 skipped.append(
                     {
@@ -186,7 +216,7 @@ class AdmAreaBulkCreateView(AdmAreaMixin, APIView):
 
             try:
                 with transaction.atomic():
-                    created.append(create_area_path(path))
+                    created.append(create_area_path(path, area_cache))
             except IntegrityError as exc:
                 sync_adm_area_id_sequence()
                 failed.append(

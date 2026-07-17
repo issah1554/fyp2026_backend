@@ -28,6 +28,9 @@ class AdmArea(models.Model):
     class Meta:
         db_table = "adm_areas"
         ordering = ["name"]
+        indexes = [
+            models.Index(fields=["parent", "level", "name"], name="adm_areas_path_idx"),
+        ]
 
     def save(self, *args, **kwargs):
         if not self.public_id:
