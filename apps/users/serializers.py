@@ -5,6 +5,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.auth.models import Profile
+from apps.common.validators import validate_international_phone_number
 
 from .models import Permission, Role, RolePermission
 
@@ -94,6 +95,9 @@ class ManagedUserCreateSerializer(serializers.ModelSerializer):
         validate_password(value)
         return value
 
+    def validate_phone_number(self, value):
+        return validate_international_phone_number(value)
+
     @transaction.atomic
     def create(self, validated_data):
         profile_data = {
@@ -136,6 +140,9 @@ class ManagedUserUpdateSerializer(serializers.ModelSerializer):
         if value and queryset.exists():
             raise serializers.ValidationError("A user with this email already exists.")
         return value
+
+    def validate_phone_number(self, value):
+        return validate_international_phone_number(value)
 
     def validate(self, attrs):
         request = self.context.get("request")

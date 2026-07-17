@@ -50,6 +50,23 @@ class UserAdminApiTests(APITestCase):
         self.assertTrue(list_response.data["success"])
         self.assertGreaterEqual(len(list_response.data["data"]), 2)
 
+    def test_admin_user_create_rejects_invalid_phone_number(self):
+        response = self.client.post(
+            "/api/v1/users/",
+            {
+                "username": "badphone",
+                "email": "badphone@example.com",
+                "password": "StrongPass123",
+                "role": "buyer",
+                "phone_number": "0700000010",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(response.data["success"])
+        self.assertIn("phone_number", response.data["errors"])
+
     def test_admin_can_retrieve_update_and_delete_user_by_public_id(self):
         user = get_user_model().objects.create_user(
             username="farmer1",

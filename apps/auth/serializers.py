@@ -6,6 +6,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
+from apps.common.validators import validate_international_phone_number
 from .models import EmailVerificationToken, PasswordResetToken, Profile
 from apps.users.models import Role
 
@@ -74,6 +75,9 @@ class RegisterSerializer(serializers.ModelSerializer):
     def validate_password(self, value):
         validate_password(value)
         return value
+
+    def validate_phone_number(self, value):
+        return validate_international_phone_number(value)
 
     @transaction.atomic
     def create(self, validated_data):

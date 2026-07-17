@@ -86,13 +86,53 @@ class AuthApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertFalse(response.data["success"])
-        self.assertEqual(response.data["message"], "Validation failed.")
+        self.assertNotEqual(response.data["message"], "Validation failed.")
         self.assertIn("errors", response.data)
         self.assertIn("username", response.data["errors"])
         self.assertIn("email", response.data["errors"])
         self.assertIn("password", response.data["errors"])
         self.assertIn("meta", response.data)
         self.assertIn("timestamp", response.data)
+
+    def test_registration_rejects_invalid_phone_number(self):
+        response = self.client.post(
+            "/api/v1/auth/register/",
+            {
+                "username": "invalidphone",
+                "email": "invalidphone@example.com",
+                "password": "StrongPass123",
+                "role": "farmer",
+                "phone_number": "phone +255700000001",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(response.data["success"])
+        self.assertIn("phone_number", response.data["errors"])
+
+    def test_registration_duplicate_email_message_uses_field_error(self):
+        get_user_model().objects.create_user(
+            username="existing",
+            email="existing@example.com",
+            password="StrongPass123",
+        )
+
+        response = self.client.post(
+            "/api/v1/auth/register/",
+            {
+                "username": "newuser",
+                "email": "existing@example.com",
+                "password": "StrongPass123",
+                "role": "farmer",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(response.data["success"])
+        self.assertEqual(response.data["message"], "A user with this email already exists.")
+        self.assertIn("email", response.data["errors"])
 
     def test_user_can_verify_email(self):
         user = get_user_model().objects.create_user(
