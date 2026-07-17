@@ -7,6 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("areas", "0001_initial"),
+        ("listings", "0003_remove_admarea_area_type_admarea_level"),
     ]
 
     operations = [
