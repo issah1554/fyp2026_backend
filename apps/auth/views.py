@@ -20,6 +20,18 @@ from .models import Profile
 from .services import send_email_verification, send_password_reset
 
 
+def get_frontend_origin(request):
+    origin = request.headers.get("Origin")
+    if origin:
+        return origin
+
+    referer = request.headers.get("Referer")
+    if referer:
+        return referer
+
+    return None
+
+
 @extend_schema(
     tags=["Auth"],
     request=RegisterSerializer,
@@ -33,7 +45,7 @@ class RegisterView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        send_email_verification(user)
+        send_email_verification(user, frontend_origin=get_frontend_origin(request))
         return mutation_response(
             message="User registered successfully. Check your email to verify your account.",
             data=UserSerializer(user).data,
@@ -103,7 +115,7 @@ class ResendEmailVerificationView(APIView):
         if user is not None:
             profile, _created = Profile.objects.get_or_create(user=user)
             if not profile.is_email_verified:
-                send_email_verification(user)
+                send_email_verification(user, frontend_origin=get_frontend_origin(request))
         return mutation_response(
             message="If the account exists and is unverified, a verification email has been sent.",
             status_code=status.HTTP_200_OK,

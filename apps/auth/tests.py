@@ -25,6 +25,7 @@ class AuthApiTests(APITestCase):
                 "phone_number": "+255700000001",
                 "organization": "Ifakara Farmers Group",
             },
+            HTTP_ORIGIN="http://localhost:3000",
             format="json",
         )
 
@@ -44,6 +45,33 @@ class AuthApiTests(APITestCase):
         self.assertIn("timestamp", response.data)
         self.assertEqual(EmailVerificationToken.objects.count(), 1)
         self.assertEqual(len(mail.outbox), 1)
+        verification_token = EmailVerificationToken.objects.get()
+        self.assertIn(
+            f"http://localhost:3000/auth/email-verification?token={verification_token.token}",
+            mail.outbox[0].body,
+        )
+
+    def test_registration_verification_email_uses_request_origin(self):
+        response = self.client.post(
+            "/api/v1/auth/register/",
+            {
+                "username": "verceluser",
+                "email": "vercel@example.com",
+                "password": "StrongPass123",
+                "first_name": "Vercel",
+                "last_name": "User",
+                "role": "buyer",
+            },
+            HTTP_ORIGIN="https://fyp2026-web.vercel.app",
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        verification_token = EmailVerificationToken.objects.get()
+        self.assertIn(
+            f"https://fyp2026-web.vercel.app/auth/email-verification?token={verification_token.token}",
+            mail.outbox[0].body,
+        )
 
     def test_registration_validation_errors_use_response_schema(self):
         response = self.client.post(
@@ -188,6 +216,7 @@ class AuthApiTests(APITestCase):
         response = self.client.post(
             "/api/v1/auth/email/resend/",
             {"email": "amina@example.com"},
+            HTTP_ORIGIN="https://fyp2026-web.vercel.app",
             format="json",
         )
 
@@ -195,6 +224,11 @@ class AuthApiTests(APITestCase):
         self.assertTrue(response.data["success"])
         self.assertEqual(EmailVerificationToken.objects.count(), 1)
         self.assertEqual(len(mail.outbox), 1)
+        verification_token = EmailVerificationToken.objects.get()
+        self.assertIn(
+            f"https://fyp2026-web.vercel.app/auth/email-verification?token={verification_token.token}",
+            mail.outbox[0].body,
+        )
 
     def test_user_can_request_password_reset(self):
         get_user_model().objects.create_user(

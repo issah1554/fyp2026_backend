@@ -1,5 +1,6 @@
 from datetime import timedelta
 from secrets import token_urlsafe
+from urllib.parse import urlencode, urlparse
 
 from django.conf import settings
 from django.core.mail import send_mail
@@ -20,11 +21,31 @@ def create_email_verification_token(user):
     )
 
 
-def send_email_verification(user):
+def normalize_frontend_origin(origin):
+    if not origin:
+        return getattr(settings, "FRONTEND_URL", "http://localhost:3000").rstrip("/")
+
+    parsed_origin = urlparse(origin)
+    if parsed_origin.scheme not in {"http", "https"} or not parsed_origin.netloc:
+        return getattr(settings, "FRONTEND_URL", "http://localhost:3000").rstrip("/")
+
+    return f"{parsed_origin.scheme}://{parsed_origin.netloc}"
+
+
+def build_email_verification_url(verification_token, frontend_origin=None):
+    frontend_origin = normalize_frontend_origin(frontend_origin)
+    query = urlencode({"token": verification_token.token, "email": verification_token.user.email})
+    return f"{frontend_origin}/auth/email-verification?{query}"
+
+
+def send_email_verification(user, frontend_origin=None):
     verification_token = create_email_verification_token(user)
+    verification_url = build_email_verification_url(verification_token, frontend_origin)
     subject = "Verify your Smart Market email"
     message = (
-        "Use this token to verify your Smart Market account:\n\n"
+        "Use this link to verify your Smart Market account:\n\n"
+        f"{verification_url}\n\n"
+        "Or copy this token into the email verification page:\n\n"
         f"{verification_token.token}\n\n"
         f"This token expires in {EMAIL_VERIFICATION_TOKEN_HOURS} hours."
     )
