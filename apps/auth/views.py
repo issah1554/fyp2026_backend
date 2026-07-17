@@ -1,5 +1,6 @@
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import generics, permissions, status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.views import APIView
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -8,6 +9,7 @@ from apps.common.responses import mutation_payload, mutation_response, success_r
 
 from .serializers import (
     AuthTokenObtainPairSerializer,
+    MobileLoginSerializer,
     RegisterSerializer,
     ResendEmailVerificationSerializer,
     UserSerializer,
@@ -132,4 +134,122 @@ class LogoutView(APIView):
         return mutation_response(
             message="Logout successful. Discard the access and refresh tokens on the client.",
             status_code=status.HTTP_200_OK,
+        )
+
+
+class MobileMarketOfficerMixin:
+    permission_classes = [permissions.IsAuthenticated]
+
+    def ensure_market_officer(self, user):
+        profile, _created = Profile.objects.get_or_create(user=user)
+        if profile.role != Profile.Role.MARKET_OFFICER:
+            raise PermissionDenied("Mobile access is available for market officers only.")
+        return profile
+
+
+@extend_schema(
+    tags=["Mobile Auth"],
+    request=MobileLoginSerializer,
+    responses={200: MobileLoginSerializer},
+)
+class MobileLoginView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = MobileLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return mutation_response(
+            message="Umeingia kwenye akaunti yako kwa mafanikio.",
+            data=serializer.validated_data,
+            status_code=status.HTTP_200_OK,
+        )
+
+
+@extend_schema(
+    tags=["Mobile Auth"],
+    responses={200: UserSerializer},
+)
+class MobileMeView(MobileMarketOfficerMixin, APIView):
+    def get(self, request):
+        self.ensure_market_officer(request.user)
+        return success_response(UserSerializer(request.user).data)
+
+
+@extend_schema(
+    tags=["Mobile Auth"],
+    responses={200: OpenApiResponse(description="Market officer dashboard payload.")},
+)
+class MobileDashboardView(MobileMarketOfficerMixin, APIView):
+    def get(self, request):
+        profile = self.ensure_market_officer(request.user)
+        return success_response(
+            {
+                "user": UserSerializer(request.user).data,
+                "profile_summary": {
+                    "display_name": request.user.get_full_name() or request.user.email,
+                    "role": profile.get_role_display(),
+                    "email": request.user.email,
+                    "organization": profile.organization,
+                },
+                "summary_cards": [
+                    {
+                        "label": "Active Markets",
+                        "value": "18",
+                        "change": "+3 this month",
+                        "icon": "storefront",
+                        "tone": "primary",
+                    },
+                    {
+                        "label": "Price Records",
+                        "value": "12,840",
+                        "change": "+428 today",
+                        "icon": "database",
+                        "tone": "accent",
+                    },
+                    {
+                        "label": "Pending Reviews",
+                        "value": "34",
+                        "change": "12 high priority",
+                        "icon": "assignment_turned_in",
+                        "tone": "warning",
+                    },
+                    {
+                        "label": "Registered Users",
+                        "value": "4,920",
+                        "change": "+126 this week",
+                        "icon": "groups",
+                        "tone": "success",
+                    },
+                ],
+                "collection_progress": [
+                    {"market": "Ifakara Central", "commodity": "Rice", "progress": 96, "status": "Verified"},
+                    {"market": "Mlimba Market", "commodity": "Maize", "progress": 88, "status": "Review"},
+                    {"market": "Mang'ula Market", "commodity": "Tomatoes", "progress": 75, "status": "Pending"},
+                    {"market": "Kidatu Market", "commodity": "Beans", "progress": 92, "status": "Verified"},
+                ],
+                "alerts": [
+                    {
+                        "title": "Rice price variance",
+                        "detail": "Ifakara Central is 14% above the weekly district average.",
+                        "icon": "trending_up",
+                    },
+                    {
+                        "title": "Incomplete officer submissions",
+                        "detail": "Three assigned markets have not completed afternoon updates.",
+                        "icon": "warning_amber",
+                    },
+                    {
+                        "title": "USSD usage spike",
+                        "detail": "Commodity lookup sessions increased by 22% since yesterday.",
+                        "icon": "phone_iphone",
+                    },
+                ],
+                "forecast_rows": [
+                    {"commodity": "Rice", "direction": "Rising", "confidence": "89%", "price": "TZS 2,850"},
+                    {"commodity": "Maize", "direction": "Stable", "confidence": "82%", "price": "TZS 1,120"},
+                    {"commodity": "Beans", "direction": "Rising", "confidence": "77%", "price": "TZS 3,400"},
+                    {"commodity": "Tomatoes", "direction": "Falling", "confidence": "73%", "price": "TZS 1,650"},
+                ],
+                "pipeline_steps": ["Ingest", "Clean", "Predict"],
+            }
         )

@@ -175,3 +175,73 @@ class AuthApiTests(APITestCase):
         self.assertEqual(response.data["errors"], {})
         self.assertIn("meta", response.data)
         self.assertIn("timestamp", response.data)
+
+    def test_market_officer_can_login_from_mobile_and_access_dashboard(self):
+        user = get_user_model().objects.create_user(
+            username="marketofficer",
+            email="officer@example.com",
+            password="StrongPass123",
+            first_name="Amina",
+            last_name="Officer",
+        )
+        Profile.objects.create(
+            user=user,
+            role=Profile.Role.MARKET_OFFICER,
+            phone_number="+255700000099",
+            email_verified_at=timezone.now(),
+        )
+
+        login_response = self.client.post(
+            "/api/auth/login/",
+            {
+                "email": "officer@example.com",
+                "password": "StrongPass123",
+            },
+            format="json",
+        )
+
+        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(login_response.data["success"])
+        self.assertEqual(login_response.data["message"], "Umeingia kwenye akaunti yako kwa mafanikio.")
+        self.assertIn("access", login_response.data["data"])
+        self.assertIn("refresh", login_response.data["data"])
+        self.assertEqual(login_response.data["data"]["user"]["profile"]["role"], "market_officer")
+
+        access = login_response.data["data"]["access"]
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
+
+        me_response = self.client.get("/api/auth/me/")
+        self.assertEqual(me_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(me_response.data["data"]["email"], "officer@example.com")
+
+        dashboard_response = self.client.get("/api/auth/dashboard/")
+        self.assertEqual(dashboard_response.status_code, status.HTTP_200_OK)
+        self.assertIn("summary_cards", dashboard_response.data["data"])
+        self.assertIn("collection_progress", dashboard_response.data["data"])
+        self.assertIn("alerts", dashboard_response.data["data"])
+
+    def test_non_market_officer_cannot_login_from_mobile(self):
+        user = get_user_model().objects.create_user(
+            username="buyer",
+            email="buyer@example.com",
+            password="StrongPass123",
+        )
+        Profile.objects.create(
+            user=user,
+            role=Profile.Role.BUYER,
+            phone_number="+255700000088",
+            email_verified_at=timezone.now(),
+        )
+
+        response = self.client.post(
+            "/api/auth/login/",
+            {
+                "email": "buyer@example.com",
+                "password": "StrongPass123",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertFalse(response.data["success"])
+        self.assertEqual(response.data["message"], "Mobile access is available for market officers only.")

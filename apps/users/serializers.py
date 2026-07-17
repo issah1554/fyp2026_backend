@@ -18,6 +18,8 @@ class ManagedProfileSerializer(serializers.ModelSerializer):
             "role",
             "phone_number",
             "organization",
+            "farm_location",
+            "farm_group",
             "is_email_verified",
             "email_verified_at",
         ]
@@ -61,6 +63,8 @@ class ManagedUserCreateSerializer(serializers.ModelSerializer):
     role = serializers.ChoiceField(choices=Profile.Role.choices, default=Profile.Role.FARMER)
     phone_number = serializers.CharField(required=False, allow_blank=True)
     organization = serializers.CharField(required=False, allow_blank=True)
+    farm_location = serializers.CharField(required=False, allow_blank=True)
+    farm_group = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = User
@@ -76,6 +80,8 @@ class ManagedUserCreateSerializer(serializers.ModelSerializer):
             "role",
             "phone_number",
             "organization",
+            "farm_location",
+            "farm_group",
         ]
 
     def validate_email(self, value):
@@ -93,6 +99,8 @@ class ManagedUserCreateSerializer(serializers.ModelSerializer):
             "role": validated_data.pop("role", Profile.Role.FARMER),
             "phone_number": validated_data.pop("phone_number", ""),
             "organization": validated_data.pop("organization", ""),
+            "farm_location": validated_data.pop("farm_location", ""),
+            "farm_group": validated_data.pop("farm_group", ""),
         }
         password = validated_data.pop("password")
         user = User(**validated_data)
@@ -106,6 +114,8 @@ class ManagedUserUpdateSerializer(serializers.ModelSerializer):
     role = serializers.ChoiceField(choices=Profile.Role.choices, required=False)
     phone_number = serializers.CharField(required=False, allow_blank=True)
     organization = serializers.CharField(required=False, allow_blank=True)
+    farm_location = serializers.CharField(required=False, allow_blank=True)
+    farm_group = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = User
@@ -120,6 +130,8 @@ class ManagedUserUpdateSerializer(serializers.ModelSerializer):
             "role",
             "phone_number",
             "organization",
+            "farm_location",
+            "farm_group",
         ]
 
     def validate_email(self, value):
@@ -151,6 +163,8 @@ class ManagedUserUpdateSerializer(serializers.ModelSerializer):
             "role": validated_data.pop("role", serializers.empty),
             "phone_number": validated_data.pop("phone_number", serializers.empty),
             "organization": validated_data.pop("organization", serializers.empty),
+            "farm_location": validated_data.pop("farm_location", serializers.empty),
+            "farm_group": validated_data.pop("farm_group", serializers.empty),
         }
 
         for field, value in validated_data.items():

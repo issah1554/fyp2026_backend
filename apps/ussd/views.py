@@ -1,11 +1,17 @@
 from decimal import Decimal, InvalidOperation
 
+from django.contrib.auth import get_user_model
 from django.http import HttpResponse
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
+from apps.auth.models import Profile
+
 from .models import UssdPriceAlert, UssdSubscriber
+
+User = get_user_model()
 
 
 ROLE_MAP = {
@@ -59,6 +65,8 @@ class UssdMenuView(View):
     def _normalize_segments(self, text):
         if not text:
             return []
+        if text.strip() == "0":
+            return ["0"]
 
         normalized = []
         for segment in text.split("*"):
@@ -85,6 +93,42 @@ class UssdMenuView(View):
     def _is_exit(self, segments):
         return segments == ["0"]
 
+    def _split_name(self, full_name):
+        name_parts = full_name.split()
+        if not name_parts:
+            return "USSD", "User"
+        first_name = name_parts[0]
+        last_name = " ".join(name_parts[1:])
+        return first_name, last_name
+
+    def _sync_backend_profile(self, phone_number, full_name, role):
+        profile = Profile.objects.select_related("user").filter(phone_number=phone_number).first()
+        first_name, last_name = self._split_name(full_name)
+
+        if profile is None:
+            user = User(username=phone_number, first_name=first_name, last_name=last_name)
+            user.set_unusable_password()
+            user.save()
+            profile = Profile.objects.create(
+                user=user,
+                role=role,
+                phone_number=phone_number,
+                email_verified_at=timezone.now(),
+            )
+            return user, profile
+
+        user = profile.user
+        user.username = phone_number
+        user.first_name = first_name
+        user.last_name = last_name
+        user.save(update_fields=["username", "first_name", "last_name"])
+
+        update_fields = ["role", "phone_number", "updated_at"]
+        profile.role = role
+        profile.phone_number = phone_number
+        profile.save(update_fields=update_fields)
+        return user, profile
+
     def _handle_registration(self, phone_number, segments):
         if not segments:
             return "CON Welcome to SmartMarket DSS.\nEnter your full name"
@@ -103,9 +147,10 @@ class UssdMenuView(View):
         if role is None:
             return "END Invalid role selection."
 
+        user, _profile = self._sync_backend_profile(phone_number or "unknown", full_name, role)
         UssdSubscriber.objects.update_or_create(
             phone_number=phone_number or "unknown",
-            defaults={"full_name": full_name, "role": role},
+            defaults={"user": user, "full_name": full_name, "role": role},
         )
         return self._main_menu()
 
@@ -157,26 +202,84 @@ class UssdMenuView(View):
             )
         return "END Invalid choice."
 
-    def _handle_account(self, subscriber, segments):
-        if len(segments) == 1:
+    def _profile_for_subscriber(self, subscriber):
+        if subscriber.user_id:
+            profile, _created = Profile.objects.get_or_create(
+                user=subscriber.user,
+                defaults={
+                    "role": subscriber.role,
+                    "phone_number": subscriber.phone_number,
+                },
+            )
+            profile_needs_update = False
+            if profile.role != subscriber.role:
+                profile.role = subscriber.role
+                profile_needs_update = True
+            if not profile.phone_number:
+                profile.phone_number = subscriber.phone_number
+                profile_needs_update = True
+            if profile_needs_update:
+                profile.save(update_fields=["role", "phone_number", "updated_at"])
+            return profile
+
+        user, profile = self._sync_backend_profile(
+            subscriber.phone_number,
+            subscriber.full_name,
+            subscriber.role,
+        )
+        subscriber.user = user
+        subscriber.save(update_fields=["user"])
+        return profile
+
+    def _account_menu(self, subscriber):
+        if subscriber.role == UssdSubscriber.Role.FARMER:
             return (
                 "CON My Account\n"
                 "1. View Profile\n"
                 "2. Change Role\n"
                 "3. Set Price Alert\n"
+                "4. Update Farm Location\n"
+                "5. Update Farm Group\n"
                 "0. Back"
             )
+        return (
+            "CON My Account\n"
+            "1. View Profile\n"
+            "2. Change Role\n"
+            "3. Set Price Alert\n"
+            "0. Back"
+        )
+
+    def _view_profile_response(self, subscriber, profile):
+        message = (
+            f"END Name: {subscriber.full_name}, Role: {subscriber.get_role_display()}, "
+            f"Phone: {subscriber.phone_number}"
+        )
+        if subscriber.role == UssdSubscriber.Role.FARMER:
+            farm_location = profile.farm_location or "Not set"
+            farm_group = profile.farm_group or "Not set"
+            message += f", Farm Location: {farm_location}, Farm Group: {farm_group}"
+        return message
+
+    def _handle_account(self, subscriber, segments):
+        profile = self._profile_for_subscriber(subscriber)
+
+        if len(segments) == 1:
+            return self._account_menu(subscriber)
+
         if len(segments) == 2:
             if segments[1] == "1":
-                return (
-                    f"END Name: {subscriber.full_name}, Role: {subscriber.get_role_display()}, "
-                    f"Phone: {subscriber.phone_number}"
-                )
+                return self._view_profile_response(subscriber, profile)
             if segments[1] == "2":
                 return "CON Change role\n1. Farmer\n2. Entrepreneur\n3. Buyer\n0. Back"
             if segments[1] == "3":
                 return "CON Select commodity alert\n1. Maize\n2. Rice\n0. Back"
+            if segments[1] == "4" and subscriber.role == UssdSubscriber.Role.FARMER:
+                return "CON Enter farm location"
+            if segments[1] == "5" and subscriber.role == UssdSubscriber.Role.FARMER:
+                return "CON Enter farm group"
             return "END Invalid account option."
+
         if len(segments) == 3:
             if segments[1] == "2":
                 role = ROLE_MAP.get(segments[2])
@@ -184,13 +287,24 @@ class UssdMenuView(View):
                     return "END Invalid role selection."
                 subscriber.role = role
                 subscriber.save(update_fields=["role", "updated_at"])
+                profile.role = role
+                profile.save(update_fields=["role", "updated_at"])
                 return f"END Role updated to {subscriber.get_role_display()}."
             if segments[1] == "3":
                 if segments[2] not in COMMODITY_MAP:
                     return "END Invalid commodity selection."
                 commodity_name = COMMODITY_MAP[segments[2]][1]
                 return f"CON Enter target price for {commodity_name}"
+            if segments[1] == "4" and subscriber.role == UssdSubscriber.Role.FARMER:
+                profile.farm_location = segments[2]
+                profile.save(update_fields=["farm_location", "updated_at"])
+                return f"END Farm location updated to {profile.farm_location}."
+            if segments[1] == "5" and subscriber.role == UssdSubscriber.Role.FARMER:
+                profile.farm_group = segments[2]
+                profile.save(update_fields=["farm_group", "updated_at"])
+                return f"END Farm group updated to {profile.farm_group}."
             return "END Invalid account option."
+
         if len(segments) == 4 and segments[1] == "3":
             commodity = COMMODITY_MAP.get(segments[2])
             if commodity is None:
@@ -218,7 +332,7 @@ class UssdMenuView(View):
 
         _ = session_id, service_code, phone_number
         segments = self._normalize_segments(text)
-        subscriber = UssdSubscriber.objects.filter(phone_number=phone_number).first()
+        subscriber = UssdSubscriber.objects.select_related("user").filter(phone_number=phone_number).first()
 
         if self._is_exit(segments):
             response_text = "END Thank you for using SmartMarket DSS. Asante! Kwa heri."

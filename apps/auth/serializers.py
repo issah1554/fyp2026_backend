@@ -16,7 +16,15 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Profile
-        fields = ["role", "phone_number", "organization", "is_email_verified", "email_verified_at"]
+        fields = [
+            "role",
+            "phone_number",
+            "organization",
+            "farm_location",
+            "farm_group",
+            "is_email_verified",
+            "email_verified_at",
+        ]
         read_only_fields = ["email_verified_at"]
 
 
@@ -46,6 +54,8 @@ class RegisterSerializer(serializers.ModelSerializer):
     role = serializers.ChoiceField(choices=Profile.Role.choices, default=Profile.Role.FARMER)
     phone_number = serializers.CharField(required=False, allow_blank=True)
     organization = serializers.CharField(required=False, allow_blank=True)
+    farm_location = serializers.CharField(required=False, allow_blank=True)
+    farm_group = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = User
@@ -58,6 +68,8 @@ class RegisterSerializer(serializers.ModelSerializer):
             "role",
             "phone_number",
             "organization",
+            "farm_location",
+            "farm_group",
         ]
 
     def validate_email(self, value):
@@ -75,6 +87,8 @@ class RegisterSerializer(serializers.ModelSerializer):
             "role": validated_data.pop("role", Profile.Role.FARMER),
             "phone_number": validated_data.pop("phone_number", ""),
             "organization": validated_data.pop("organization", ""),
+            "farm_location": validated_data.pop("farm_location", ""),
+            "farm_group": validated_data.pop("farm_group", ""),
         }
         password = validated_data.pop("password")
         user = User(**validated_data)
@@ -123,3 +137,30 @@ class ResendEmailVerificationSerializer(serializers.Serializer):
     def validate_email(self, value):
         self.context["user"] = User.objects.filter(email__iexact=value).first()
         return value
+
+
+class MobileLoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        email = attrs["email"].strip()
+        password = attrs["password"]
+        user = User.objects.filter(email__iexact=email).select_related("profile").first()
+
+        if user is None or not user.check_password(password):
+            raise AuthenticationFailed("Email address or password is incorrect.")
+        profile, _created = Profile.objects.get_or_create(user=user)
+        if profile.role != Profile.Role.MARKET_OFFICER:
+            raise AuthenticationFailed("Mobile access is available for market officers only.")
+        if not user.is_active:
+            raise AuthenticationFailed("This account is inactive.")
+
+        refresh = AuthTokenObtainPairSerializer.get_token(user)
+        access = refresh.access_token
+
+        return {
+            "access": str(access),
+            "refresh": str(refresh),
+            "user": UserSerializer(user).data,
+        }

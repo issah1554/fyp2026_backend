@@ -1,4 +1,4 @@
-
+from django.conf import settings
 from django.db import models
 
 from apps.common.ids import generate_unique_public_id
@@ -11,6 +11,13 @@ class UssdSubscriber(models.Model):
         BUYER = "buyer", "Buyer"
 
     public_id = models.CharField(max_length=10, unique=True, editable=False)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ussd_subscriber",
+    )
     phone_number = models.CharField(max_length=32, unique=True)
     full_name = models.CharField(max_length=150)
     role = models.CharField(max_length=32, choices=Role.choices)
