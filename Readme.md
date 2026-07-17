@@ -69,6 +69,12 @@ Apply pending migrations:
 python manage.py migrate
 ```
 
+Collect static files for production:
+
+```powershell
+python manage.py collectstatic --noinput
+```
+
 Show migration status:
 
 ```powershell
