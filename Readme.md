@@ -241,6 +241,38 @@ Admin URL:
 http://127.0.0.1:8000/admin/
 ```
 
+## Seed Sample System Users
+
+Run migrations first, then seed verified sample users:
+
+```powershell
+python manage.py migrate
+python manage.py seed_system_users
+```
+
+The default password for all seeded users is:
+
+```text
+StrongPass123
+```
+
+To set a different password:
+
+```powershell
+python manage.py seed_system_users --password YourPassword123
+```
+
+Seeded verified accounts:
+
+```text
+admin_sample           system.admin@user.com
+farmer_sample          system.farmer@user.com
+entrepreneur_sample    system.entrepreneur@user.com
+buyer_sample           system.buyer@user.com
+market_officer_sample  system.market_officer@user.com
+researcher_sample      system.researcher@user.com
+```
+
 ## Useful Django Shell Commands
 
 Open the Django shell:

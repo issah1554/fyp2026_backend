@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -213,3 +214,18 @@ class UserAdminApiTests(APITestCase):
         response = self.client.delete(f"/api/v1/users/roles/{admin_role.public_id}/")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertTrue(Role.objects.filter(pk=admin_role.pk).exists())
+
+    def test_seed_system_users_creates_verified_role_profiles(self):
+        call_command("seed_system_users", password="StrongPass123")
+
+        sample = get_user_model().objects.get(username="buyer_sample")
+        self.assertTrue(sample.check_password("StrongPass123"))
+        self.assertEqual(sample.email, "system.buyer@user.com")
+        self.assertTrue(sample.is_active)
+        self.assertEqual(sample.profile.role.code, Profile.Role.BUYER)
+        self.assertIsNotNone(sample.profile.email_verified_at)
+
+        call_command("seed_system_users", password="ChangedPass123")
+        self.assertEqual(get_user_model().objects.filter(username="buyer_sample").count(), 1)
+        sample.refresh_from_db()
+        self.assertTrue(sample.check_password("ChangedPass123"))
