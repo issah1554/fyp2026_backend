@@ -263,3 +263,80 @@ class AuthApiTests(APITestCase):
         self.assertEqual(response.data["errors"], {})
         self.assertIn("meta", response.data)
         self.assertIn("timestamp", response.data)
+
+    def test_user_can_delete_own_account(self):
+        user = get_user_model().objects.create_user(
+            username="marketofficer",
+            email="officer@example.com",
+            password="StrongPass123",
+        )
+        Profile.objects.create(user=user, email_verified_at=timezone.now())
+        self.client.force_authenticate(user=user)
+
+        response = self.client.delete(
+            "/api/v1/auth/me/",
+            {
+                "password": "StrongPass123",
+                "confirmation": "DELETE MY ACCOUNT",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["success"])
+        self.assertEqual(response.data["message"], "Account deleted successfully.")
+        self.assertFalse(get_user_model().objects.filter(pk=user.pk).exists())
+        self.assertFalse(Profile.objects.filter(user_id=user.pk).exists())
+
+    def test_account_deletion_requires_authentication(self):
+        response = self.client.delete("/api/v1/auth/me/")
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertFalse(response.data["success"])
+        self.assertIn("message", response.data)
+
+    def test_account_deletion_requires_current_password(self):
+        user = get_user_model().objects.create_user(
+            username="marketofficer",
+            email="officer@example.com",
+            password="StrongPass123",
+        )
+        Profile.objects.create(user=user, email_verified_at=timezone.now())
+        self.client.force_authenticate(user=user)
+
+        response = self.client.delete(
+            "/api/v1/auth/me/",
+            {
+                "password": "WrongPass123",
+                "confirmation": "DELETE MY ACCOUNT",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(response.data["success"])
+        self.assertIn("password", response.data["errors"])
+        self.assertTrue(get_user_model().objects.filter(pk=user.pk).exists())
+
+    def test_account_deletion_requires_confirmation_message(self):
+        user = get_user_model().objects.create_user(
+            username="marketofficer",
+            email="officer@example.com",
+            password="StrongPass123",
+        )
+        Profile.objects.create(user=user, email_verified_at=timezone.now())
+        self.client.force_authenticate(user=user)
+
+        response = self.client.delete(
+            "/api/v1/auth/me/",
+            {
+                "password": "StrongPass123",
+                "confirmation": "delete my account",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(response.data["success"])
+        self.assertIn("confirmation", response.data["errors"])
+        self.assertTrue(get_user_model().objects.filter(pk=user.pk).exists())

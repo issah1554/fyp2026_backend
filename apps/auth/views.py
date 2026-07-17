@@ -7,6 +7,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from apps.common.responses import mutation_payload, mutation_response, success_response
 
 from .serializers import (
+    AccountDeletionSerializer,
     AuthTokenObtainPairSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
@@ -149,13 +150,26 @@ class PasswordResetConfirmView(APIView):
 
 @extend_schema(
     tags=["Auth"],
-    responses={200: UserSerializer},
 )
 class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses={200: UserSerializer})
     def get(self, request):
         return success_response(UserSerializer(request.user).data)
+
+    @extend_schema(
+        request=AccountDeletionSerializer,
+        responses={200: OpenApiResponse(description="Authenticated account deleted.")},
+    )
+    def delete(self, request):
+        serializer = AccountDeletionSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        request.user.delete()
+        return mutation_response(
+            message="Account deleted successfully.",
+            status_code=status.HTTP_200_OK,
+        )
 
 
 @extend_schema(

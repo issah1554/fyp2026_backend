@@ -161,3 +161,23 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         reset_token.user.save(update_fields=["password"])
         reset_token.mark_used()
         return reset_token.user
+
+
+class AccountDeletionSerializer(serializers.Serializer):
+    password = serializers.CharField(write_only=True)
+    confirmation = serializers.CharField()
+
+    CONFIRMATION_MESSAGE = "DELETE MY ACCOUNT"
+
+    def validate_password(self, value):
+        user = self.context["request"].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Password is incorrect.")
+        return value
+
+    def validate_confirmation(self, value):
+        if value != self.CONFIRMATION_MESSAGE:
+            raise serializers.ValidationError(
+                f'Confirmation must exactly match "{self.CONFIRMATION_MESSAGE}".'
+            )
+        return value
