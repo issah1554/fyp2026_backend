@@ -4,6 +4,7 @@ from urllib.parse import urlencode, urlparse
 
 from django.conf import settings
 from django.core.mail import send_mail
+from django.template.loader import render_to_string
 from django.utils import timezone
 
 from .models import EmailVerificationToken, PasswordResetToken
@@ -42,19 +43,24 @@ def send_email_verification(user, frontend_origin=None):
     verification_token = create_email_verification_token(user)
     verification_url = build_email_verification_url(verification_token, frontend_origin)
     subject = "Verify your Smart Market email"
+    context = {
+        "user": user,
+        "verification_url": verification_url,
+        "expires_in_hours": EMAIL_VERIFICATION_TOKEN_HOURS,
+    }
     message = (
-        "Use this link to verify your Smart Market account:\n\n"
+        "Verify your Smart Market account using this link:\n\n"
         f"{verification_url}\n\n"
-        "Or copy this token into the email verification page:\n\n"
-        f"{verification_token.token}\n\n"
         f"This token expires in {EMAIL_VERIFICATION_TOKEN_HOURS} hours."
     )
+    html_message = render_to_string("auth/email_verification.html", context)
     send_mail(
         subject=subject,
         message=message,
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
         recipient_list=[user.email],
         fail_silently=False,
+        html_message=html_message,
     )
     return verification_token
 

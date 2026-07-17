@@ -50,6 +50,10 @@ class AuthApiTests(APITestCase):
             f"http://localhost:3000/auth/email-verification?token={verification_token.token}",
             mail.outbox[0].body,
         )
+        self.assertNotIn("Or copy this token", mail.outbox[0].body)
+        self.assertEqual(len(mail.outbox[0].alternatives), 1)
+        self.assertIn("Verify email", mail.outbox[0].alternatives[0][0])
+        self.assertIn("text/html", mail.outbox[0].alternatives[0][1])
 
     def test_registration_verification_email_uses_request_origin(self):
         response = self.client.post(
