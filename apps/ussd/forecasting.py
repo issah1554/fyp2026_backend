@@ -59,6 +59,13 @@ def season_end_date(timestamp: pd.Timestamp) -> pd.Timestamp:
     return pd.Timestamp(year=year, month=12, day=31)
 
 
+def calendar_week_end_date(timestamp: pd.Timestamp) -> pd.Timestamp:
+    import pandas as pd
+
+    days_until_sunday = 6 - timestamp.dayofweek
+    return timestamp + pd.Timedelta(days=days_until_sunday)
+
+
 def add_calendar_features(frame: pd.DataFrame) -> pd.DataFrame:
     import numpy as np
 
@@ -136,7 +143,12 @@ class MarketPriceForecaster:
             raise ForecastUnavailable(f"Forecast model not found at {self.model_path}.")
         import joblib
 
-        self._bundle = joblib.load(self.model_path)
+        try:
+            self._bundle = joblib.load(self.model_path)
+        except Exception as exc:
+            raise ForecastUnavailable(
+                "Forecast model could not be loaded on this server."
+            ) from exc
         return self._bundle
 
     def _series_key(self, market: str, commodity: str, pricetype: str) -> str:
@@ -187,6 +199,87 @@ class MarketPriceForecaster:
             )
         return float(recursive_history.loc[recursive_history["date"] == target_date, "price"].iloc[0])
 
+    def predict_daily_range(
+        self,
+        market: str,
+        commodity: str,
+        pricetype: str,
+        start_date,
+        end_date,
+        progress_callback=None,
+    ) -> dict:
+        import pandas as pd
+
+        bundle = self._load_bundle()
+        metadata = bundle["series_metadata"]
+        models = bundle["models"]
+        histories = bundle["histories"]
+        feature_columns = bundle["feature_columns"]
+
+        prediction_start = pd.Timestamp(start_date).normalize()
+        prediction_end = pd.Timestamp(end_date).normalize()
+        if prediction_end < prediction_start:
+            raise ForecastUnavailable("End date must not be before start date.")
+
+        series_key = self._series_key(market, commodity, pricetype)
+        if series_key not in metadata or series_key not in models or series_key not in histories:
+            raise ForecastUnavailable(f"No prediction data for {market}, {commodity}, {pricetype}.")
+
+        model = models[series_key]
+        history = histories[series_key].copy().sort_values("date").reset_index(drop=True)
+        history["date"] = pd.to_datetime(history["date"])
+
+        prior_history = history[history["date"] < prediction_start].copy().reset_index(drop=True)
+        if prior_history.empty:
+            raise ForecastUnavailable("Target date is too early for forecasting.")
+
+        recursive_history = prior_history
+        max_known_date = recursive_history["date"].max()
+        if prediction_start > max_known_date + pd.Timedelta(days=1):
+            for warmup_date in pd.date_range(max_known_date + pd.Timedelta(days=1), prediction_start - pd.Timedelta(days=1), freq="D"):
+                feature_row = build_feature_row(recursive_history, warmup_date, feature_columns)
+                warmup_prediction = float(model.predict(feature_row)[0])
+                recursive_history = pd.concat(
+                    [recursive_history, pd.DataFrame({"date": [warmup_date], "price": [warmup_prediction]})],
+                    ignore_index=True,
+                )
+
+        predictions = {}
+        total_days = len(pd.date_range(prediction_start, prediction_end, freq="D"))
+        for index, date_value in enumerate(pd.date_range(prediction_start, prediction_end, freq="D"), start=1):
+            if progress_callback is not None:
+                progress_callback(
+                    {
+                        "status": "running",
+                        "current": index - 1,
+                        "total": total_days,
+                        "target_date": date_value.date().isoformat(),
+                    }
+                )
+            feature_row = build_feature_row(recursive_history, date_value, feature_columns)
+            prediction = float(model.predict(feature_row)[0])
+            recursive_history = pd.concat(
+                [recursive_history, pd.DataFrame({"date": [date_value], "price": [prediction]})],
+                ignore_index=True,
+            )
+            predictions[date_value.date().isoformat()] = prediction
+            if progress_callback is not None:
+                progress_callback(
+                    {
+                        "status": "running",
+                        "current": index,
+                        "total": total_days,
+                        "target_date": date_value.date().isoformat(),
+                    }
+                )
+        return {
+            "market": market,
+            "commodity": commodity,
+            "pricetype": pricetype,
+            "predictions": predictions,
+            "currency": metadata[series_key]["currency"],
+        }
+
     def predict(self, market: str, commodity: str, pricetype: str, unit: str, period: str, target_date=None) -> ForecastResult:
         import numpy as np
         import pandas as pd
@@ -203,7 +296,7 @@ class MarketPriceForecaster:
             period_end = prediction_date
             predicted_value = self._predict_daily(series_key, prediction_date)
         elif period == "weekly":
-            period_end = prediction_date + pd.Timedelta(days=6)
+            period_end = calendar_week_end_date(prediction_date)
             values = [self._predict_daily(series_key, day) for day in pd.date_range(prediction_date, period_end, freq="D")]
             predicted_value = float(np.mean(values))
         elif period == "monthly":

@@ -17,6 +17,7 @@ from .forecasting import (
     get_forecast_service,
 )
 from .models import UssdPriceAlert, UssdSubscriber
+from .prediction_cache import get_cached_prediction
 
 User = get_user_model()
 
@@ -221,25 +222,27 @@ class UssdMenuView(View):
                 return "END Invalid period selection."
 
             try:
-                result = get_forecast_service().predict(
+                result = get_cached_prediction(
                     market=market,
                     commodity=commodity,
                     pricetype=price_type[0],
-                    unit=price_type[1],
                     period=period,
                 )
-            except ForecastUnavailable as exc:
-                return f"END Prediction unavailable. {exc}"
+            except ForecastUnavailable:
+                return "END Prediction not available right now."
 
             period_label = {
-                "daily": f"Day: {result.target_date}",
-                "weekly": f"Week: {result.target_date} to {result.period_end}",
-                "monthly": f"Month: {result.target_date} to {result.period_end}",
-                "seasonal": f"Season: {result.season} ({result.target_date} to {result.period_end})",
+                "daily": f"Day: {result.target_date.isoformat()}",
+                "weekly": f"Week: {result.target_date.isoformat()} to {result.period_end.isoformat()}",
+                "monthly": f"Month: {result.target_date.isoformat()} to {result.period_end.isoformat()}",
+                "seasonal": (
+                    f"Season: {result.season} "
+                    f"({result.target_date.isoformat()} to {result.period_end.isoformat()})"
+                ),
             }[result.period]
             return (
                 "END Predicted Price\n"
-                f"Market: {result.market}\n"
+                f"Market: {result.market.name}\n"
                 f"Commodity: {result.commodity}\n"
                 f"Type: {result.pricetype} ({result.unit})\n"
                 f"{period_label}\n"

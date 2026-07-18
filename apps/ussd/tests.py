@@ -1,31 +1,20 @@
-from django.test import TestCase
+from io import StringIO
+from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
+from django.utils import timezone
 
 from apps.auth.models import Profile
+from apps.commodities.models import Market
+from apps.ussd.forecasting import calendar_week_end_date
 
-from .models import UssdPriceAlert, UssdSubscriber
+from .models import UssdMarketPrediction, UssdPriceAlert, UssdSubscriber
 
 
 class UssdMenuViewTests(TestCase):
-    @staticmethod
-    def _create_fake_forecast_result():
-        class FakeResult:
-            market = "Ifakara Central Market"
-            commodity = "Rice"
-            pricetype = "Wholesale"
-            unit = "100 KG"
-            period = "monthly"
-            target_date = "2026-07-18"
-            period_end = "2026-07-31"
-            season = "kiangazi kikuu"
-            predicted_price = 245000.5
-            currency = "TZS"
-
-        return FakeResult()
-
     def test_unregistered_user_is_prompted_to_register(self):
         response = self.client.post(
             reverse("ussd:menu-no-slash"),
@@ -164,11 +153,23 @@ class UssdMenuViewTests(TestCase):
             full_name="Jane Farmer",
             role=UssdSubscriber.Role.FARMER,
         )
+        market = Market.objects.get(name="Ifakara Central Market")
+        UssdMarketPrediction.objects.create(
+            market=market,
+            commodity="Rice",
+            pricetype="Wholesale",
+            unit="100 KG",
+            period="monthly",
+            target_date=timezone.localdate(),
+            period_end=timezone.localdate().replace(day=31),
+            season="kiangazi kikuu",
+            predicted_price="245000.50",
+            currency="TZS",
+        )
         mock_service_factory.return_value.get_market_options.return_value = [
             ("1", "Ifakara Central Market"),
             ("2", "Morogoro Central Market"),
         ]
-        mock_service_factory.return_value.predict.return_value = self._create_fake_forecast_result()
 
         response = self.client.post(
             reverse("ussd:menu"),
@@ -184,15 +185,47 @@ class UssdMenuViewTests(TestCase):
         self.assertContains(response, "Market: Ifakara Central Market")
         self.assertContains(response, "Commodity: Rice")
         self.assertContains(response, "Type: Wholesale (100 KG)")
-        self.assertContains(response, "Month: 2026-07-18 to 2026-07-31")
+        self.assertContains(
+            response,
+            f"Month: {timezone.localdate().isoformat()} to {timezone.localdate().replace(day=31).isoformat()}",
+        )
         self.assertContains(response, "Price: TZS 245,000.50")
 
-    def test_prediction_menu_prompts_for_market_commodity_type_and_period(self):
+    @patch("apps.ussd.views.get_forecast_service")
+    def test_prediction_returns_not_available_when_cache_is_missing(self, mock_service_factory):
         subscriber = UssdSubscriber.objects.create(
             phone_number="+254700000001",
             full_name="Jane Farmer",
             role=UssdSubscriber.Role.FARMER,
         )
+        mock_service_factory.return_value.get_market_options.return_value = [
+            ("1", "Ifakara Central Market"),
+            ("2", "Morogoro Central Market"),
+        ]
+
+        response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession123",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": subscriber.phone_number,
+                "text": "2*1*2*2*3",
+            },
+        )
+
+        self.assertContains(response, "END Prediction not available right now.")
+
+    @patch("apps.ussd.views.get_forecast_service")
+    def test_prediction_menu_prompts_for_market_commodity_type_and_period(self, mock_service_factory):
+        subscriber = UssdSubscriber.objects.create(
+            phone_number="+254700000001",
+            full_name="Jane Farmer",
+            role=UssdSubscriber.Role.FARMER,
+        )
+        mock_service_factory.return_value.get_market_options.return_value = [
+            ("1", "Ifakara Central Market"),
+            ("2", "Morogoro Central Market"),
+        ]
 
         market_response = self.client.post(
             reverse("ussd:menu"),
@@ -314,3 +347,65 @@ class UssdMenuViewTests(TestCase):
         )
 
         self.assertContains(response, "END Thank you for using SmartMarket DSS. Asante! Kwa heri.")
+
+
+class RefreshUssdPredictionsCommandTests(TestCase):
+    @patch("apps.ussd.management.commands.refresh_ussd_predictions.PredictionRefreshService")
+    def test_refresh_command_prints_results_and_summary(self, mock_service_class):
+        mock_service_class.return_value.refresh_for_date.return_value = {
+            "results": [object()] * 16,
+            "failures": [],
+        }
+        mock_service_class.return_value.refresh_for_date.side_effect = (
+            lambda **kwargs: kwargs["progress_callback"](
+                {
+                    "status": "completed",
+                    "market": "Ifakara Central Market",
+                    "commodity": "Beans",
+                    "pricetype": "Retail",
+                    "current": 1,
+                    "total": 1,
+                    "message": "Saved daily prediction.",
+                }
+            )
+            or {"results": [object()] * 16, "failures": []}
+        )
+        stdout = StringIO()
+
+        call_command(
+            "refresh_ussd_predictions",
+            "--date",
+            "2026-07-18",
+            stdout=stdout,
+        )
+
+        mock_service_class.return_value.refresh_for_date.assert_called_once()
+        output = stdout.getvalue()
+        self.assertIn("Starting cached USSD prediction refresh...", output)
+        self.assertIn("Saved 16 cached USSD predictions for 2026-07-18.", output)
+
+    @patch("apps.ussd.management.commands.refresh_ussd_predictions.PredictionRefreshService")
+    def test_refresh_command_reports_skipped_failures(self, mock_service_class):
+        mock_service_class.return_value.refresh_for_date.return_value = {
+            "results": [object()] * 12,
+            "failures": [{"market": "Ifakara Central Market"}] * 4,
+        }
+        stdout = StringIO()
+
+        call_command(
+            "refresh_ussd_predictions",
+            "--date",
+            "2026-07-18",
+            stdout=stdout,
+        )
+
+        output = stdout.getvalue()
+        self.assertIn("Saved 12 cached USSD predictions for 2026-07-18.", output)
+        self.assertIn("Skipped 4 prediction(s) for 2026-07-18.", output)
+
+
+class ForecastingCalendarTests(SimpleTestCase):
+    def test_weekly_period_ends_on_sunday(self):
+        period_end = calendar_week_end_date(__import__("pandas").Timestamp("2026-07-18"))
+
+        self.assertEqual(period_end.date().isoformat(), "2026-07-19")

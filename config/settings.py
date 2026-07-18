@@ -45,12 +45,21 @@ SECRET_KEY = os.environ.get(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "true").lower() in {"1", "true", "yes", "on"}
 
-DEFAULT_ALLOWED_HOSTS = ["127.0.0.1", "localhost", "134.209.77.147"]
+DEFAULT_ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "localhost",
+    "134.209.77.147",
+    "unable-periscope-boil.ngrok-free.dev",
+]
 DEFAULT_CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:3000",
     "http://127.0.0.1:8000",
     "http://localhost:8000",
+    "https://unable-periscope-boil.ngrok-free.dev",
+]
+DEFAULT_CSRF_TRUSTED_ORIGINS = [
+    "https://unable-periscope-boil.ngrok-free.dev",
 ]
 
 ALLOWED_HOSTS = [
@@ -69,6 +78,13 @@ CORS_ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.environ.get(
         "CORS_ALLOWED_ORIGINS", ",".join(DEFAULT_CORS_ALLOWED_ORIGINS)
+    ).split(",")
+    if origin.strip()
+]
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        "CSRF_TRUSTED_ORIGINS", ",".join(DEFAULT_CSRF_TRUSTED_ORIGINS)
     ).split(",")
     if origin.strip()
 ]

@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 
 from apps.common.ids import generate_unique_public_id
+from apps.commodities.models import Market
 
 
 class UssdSubscriber(models.Model):
@@ -65,3 +66,50 @@ class UssdPriceAlert(models.Model):
 
     def __str__(self):
         return f"{self.subscriber.phone_number} - {self.commodity}"
+
+
+class UssdMarketPrediction(models.Model):
+    class Commodity(models.TextChoices):
+        BEANS = "Beans", "Beans"
+        RICE = "Rice", "Rice"
+
+    class PriceType(models.TextChoices):
+        RETAIL = "Retail", "Retail"
+        WHOLESALE = "Wholesale", "Wholesale"
+
+    class Period(models.TextChoices):
+        DAILY = "daily", "Daily"
+        WEEKLY = "weekly", "Weekly"
+        MONTHLY = "monthly", "Monthly"
+        SEASONAL = "seasonal", "Seasonal"
+
+    market = models.ForeignKey(
+        Market,
+        on_delete=models.CASCADE,
+        related_name="ussd_predictions",
+    )
+    commodity = models.CharField(max_length=32, choices=Commodity.choices)
+    pricetype = models.CharField(max_length=32, choices=PriceType.choices)
+    unit = models.CharField(max_length=32)
+    period = models.CharField(max_length=32, choices=Period.choices)
+    target_date = models.DateField()
+    period_end = models.DateField()
+    season = models.CharField(max_length=64)
+    predicted_price = models.DecimalField(max_digits=14, decimal_places=2)
+    currency = models.CharField(max_length=16, default="TZS")
+    generated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["market__name", "commodity", "pricetype", "period", "-target_date"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["market", "commodity", "pricetype", "period", "target_date"],
+                name="unique_ussd_market_prediction_per_date",
+            )
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.market.name} | {self.commodity} | {self.pricetype} | "
+            f"{self.period} | {self.target_date}"
+        )
