@@ -7,7 +7,6 @@ from django.utils import timezone
 from apps.commodities.models import Market
 
 from .forecasting import (
-    COMMODITY_MAP,
     PRICE_TYPE_MAP,
     ForecastUnavailable,
     calendar_week_end_date,
@@ -54,8 +53,9 @@ class PredictionRefreshService:
 
     def _series_configs(self, markets):
         configs = []
+        commodity_names = self.forecaster.get_supported_commodity_names()
         for market in markets:
-            for commodity in COMMODITY_MAP.values():
+            for commodity in commodity_names:
                 for _, (pricetype, unit) in PRICE_TYPE_MAP.items():
                     configs.append(
                         {
@@ -188,19 +188,26 @@ class PredictionRefreshService:
                     ),
                 )
                 daily_cache[(market.id, commodity, pricetype)] = range_result
-                daily_value = range_result["predictions"][selected_timestamp.date().isoformat()]
-                prediction = self._save_prediction(
-                    market=market,
-                    commodity=commodity,
-                    pricetype=pricetype,
-                    unit=unit,
-                    period="daily",
-                    target_date=selected_timestamp.date(),
-                    period_end=selected_timestamp.date(),
-                    season=season_name,
-                    predicted_price=daily_value,
-                    currency=range_result["currency"],
-                )
+                selected_prediction = None
+                for date_key, daily_value in range_result["predictions"].items():
+                    daily_date = pd.Timestamp(date_key).date()
+                    daily_prediction = self._save_prediction(
+                        market=market,
+                        commodity=commodity,
+                        pricetype=pricetype,
+                        unit=unit,
+                        period="daily",
+                        target_date=daily_date,
+                        period_end=daily_date,
+                        season=get_season_name(pd.Timestamp(daily_date)),
+                        predicted_price=daily_value,
+                        currency=range_result["currency"],
+                    )
+                    if daily_date == selected_timestamp.date():
+                        selected_prediction = daily_prediction
+                prediction = selected_prediction
+                if prediction is None:
+                    raise ForecastUnavailable("Daily prediction for the selected date was not generated.")
                 results.append(prediction)
                 report_progress("completed", config, "Prediction series ready.", current=1, total=1)
             except ForecastUnavailable as exc:

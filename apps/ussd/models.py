@@ -113,3 +113,72 @@ class UssdMarketPrediction(models.Model):
             f"{self.market.name} | {self.commodity} | {self.pricetype} | "
             f"{self.period} | {self.target_date}"
         )
+
+
+class UssdMarketRecommendation(models.Model):
+    class Role(models.TextChoices):
+        FARMER = "farmer", "Farmer"
+        ENTREPRENEUR = "entrepreneur", "Entrepreneur"
+        BUYER = "buyer", "Buyer"
+
+    class RecommendationType(models.TextChoices):
+        TIME = "time", "Time"
+        MARKET = "market", "Market"
+
+    class Action(models.TextChoices):
+        BUY = "buy", "Buy"
+        SELL = "sell", "Sell"
+
+    class Trend(models.TextChoices):
+        RISING = "rising", "Rising"
+        FALLING = "falling", "Falling"
+        STABLE = "stable", "Stable"
+
+    class Commodity(models.TextChoices):
+        BEANS = "Beans", "Beans"
+        RICE = "Rice", "Rice"
+
+    class Period(models.TextChoices):
+        DAILY = "daily", "Daily"
+        WEEKLY = "weekly", "Weekly"
+        MONTHLY = "monthly", "Monthly"
+        SEASONAL = "seasonal", "Seasonal"
+
+    role = models.CharField(max_length=32, choices=Role.choices)
+    commodity = models.CharField(max_length=32, choices=Commodity.choices)
+    recommendation_type = models.CharField(max_length=16, choices=RecommendationType.choices)
+    action = models.CharField(max_length=16, choices=Action.choices)
+    target_date = models.DateField()
+    market = models.ForeignKey(
+        Market,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="ussd_recommendations",
+    )
+    period = models.CharField(max_length=32, choices=Period.choices, null=True, blank=True)
+    window_start = models.DateField(null=True, blank=True)
+    window_end = models.DateField(null=True, blank=True)
+    season = models.CharField(max_length=64)
+    trend = models.CharField(max_length=16, choices=Trend.choices)
+    recommended_price = models.DecimalField(max_digits=14, decimal_places=2)
+    currency = models.CharField(max_length=16, default="TZS")
+    confidence = models.DecimalField(max_digits=5, decimal_places=2)
+    summary = models.CharField(max_length=255)
+    reason = models.TextField()
+    generated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["role", "commodity", "recommendation_type", "-target_date"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["role", "commodity", "recommendation_type", "target_date"],
+                name="unique_ussd_market_recommendation_per_date",
+            )
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.role} | {self.commodity} | {self.recommendation_type} | "
+            f"{self.target_date}"
+        )

@@ -10,14 +10,16 @@ from django.views.decorators.csrf import csrf_exempt
 from apps.auth.models import Profile
 
 from .forecasting import (
-    COMMODITY_MAP as PREDICTION_COMMODITY_MAP,
     ForecastUnavailable,
     PERIOD_MAP as FORECAST_PERIOD_MAP,
     PRICE_TYPE_MAP,
+    calendar_week_end_date,
     get_forecast_service,
+    season_end_date,
 )
 from .models import UssdPriceAlert, UssdSubscriber
 from .prediction_cache import get_cached_prediction
+from .recommendations import get_cached_recommendation
 
 User = get_user_model()
 
@@ -39,23 +41,6 @@ MARKET_PRICE_DATA = {
     ("2", "1"): "END Rice at Ifakara Central: Current TZS 2,150/kg, Yesterday TZS 2,120/kg, Trend: Rising.",
     ("2", "2"): "END Rice in Nearby Markets: Current TZS 2,080/kg, Yesterday TZS 2,060/kg, Trend: Stable Upward.",
 }
-
-PREDICTION_DATA = {
-    ("1", "1"): "END Maize next 7 days: TZS 830-880/kg, Trend: Upward, Confidence: 84%.",
-    ("1", "2"): "END Rice next 7 days: TZS 2,120-2,220/kg, Trend: Stable Upward, Confidence: 81%.",
-    ("2", "1"): "END Maize next month: TZS 860-940/kg, Trend: Upward, Confidence: 78%.",
-    ("2", "2"): "END Rice next month: TZS 2,180-2,320/kg, Trend: Upward, Confidence: 76%.",
-    ("3", "1"): "END Maize next season: TZS 900-1,020/kg, Trend: Seasonal Rise, Confidence: 72%.",
-    ("3", "2"): "END Rice next season: TZS 2,240-2,420/kg, Trend: Moderate Rise, Confidence: 70%.",
-}
-
-RECOMMENDATION_DATA = {
-    ("1", "1"): "END Recommendation: Wait. Reason: Maize trend is still rising, supply is tightening, seasonal demand is improving. Confidence: 86%.",
-    ("1", "2"): "END Recommendation: Sell at Ifakara Central. Reason: Better maize demand, lower supply pressure, and stronger price momentum. Confidence: 82%.",
-    ("2", "1"): "END Recommendation: Sell Now. Reason: Rice prices are already favorable, supply is expected to improve soon, and seasonal gains may soften. Confidence: 80%.",
-    ("2", "2"): "END Recommendation: Sell at Nearby Markets. Reason: Rice has stronger buyer activity there, steady turnover, and reduced transport pressure. Confidence: 77%.",
-}
-
 
 @method_decorator(csrf_exempt, name="dispatch")
 class UssdMenuView(View):
@@ -103,6 +88,38 @@ class UssdMenuView(View):
 
     def _forecast_market_options(self):
         return get_forecast_service().get_market_options()
+
+    def _forecast_commodity_options(self):
+        return get_forecast_service().get_commodity_options()
+
+    def _recommendation_prompt_lines(self, subscriber):
+        if subscriber.role == UssdSubscriber.Role.BUYER:
+            return (
+                "CON Select need\n"
+                "1. Best Time to Buy\n"
+                "2. Best Market to Buy\n"
+                "0. Back"
+            )
+        return (
+            "CON Select need\n"
+            "1. Best Time to Sell\n"
+            "2. Best Market to Sell\n"
+            "0. Back"
+        )
+
+    def _recommendation_window_end(self, recommendation):
+        import pandas as pd
+
+        target = pd.Timestamp(recommendation.target_date).normalize()
+        if recommendation.period == "daily":
+            return recommendation.target_date.isoformat()
+        if recommendation.period == "weekly":
+            return calendar_week_end_date(target).date().isoformat()
+        if recommendation.period == "monthly":
+            return (target + pd.offsets.MonthEnd(0)).date().isoformat()
+        if recommendation.period == "seasonal":
+            return season_end_date(target).date().isoformat()
+        return recommendation.target_date.isoformat()
 
     def _split_name(self, full_name):
         name_parts = full_name.split()
@@ -191,9 +208,14 @@ class UssdMenuView(View):
             market_lookup = dict(self._forecast_market_options())
             if segments[1] not in market_lookup:
                 return "END Invalid market selection."
-            return "CON Select commodity\n1. Beans\n2. Rice\n0. Back"
+            commodity_lines = [f"{option}. {name}" for option, name in self._forecast_commodity_options()]
+            return (
+                "CON Select commodity\n"
+                + "\n".join(commodity_lines)
+                + "\n0. Back"
+            )
         if len(segments) == 3:
-            if segments[2] not in PREDICTION_COMMODITY_MAP:
+            if segments[2] not in dict(self._forecast_commodity_options()):
                 return "END Invalid commodity selection."
             return "CON Select price type\n1. Retail\n2. Wholesale\n0. Back"
         if len(segments) == 4:
@@ -209,7 +231,7 @@ class UssdMenuView(View):
             )
         if len(segments) == 5:
             market = dict(self._forecast_market_options()).get(segments[1])
-            commodity = PREDICTION_COMMODITY_MAP.get(segments[2])
+            commodity = dict(self._forecast_commodity_options()).get(segments[2])
             price_type = PRICE_TYPE_MAP.get(segments[3])
             period = FORECAST_PERIOD_MAP.get(segments[4])
             if market is None:
@@ -250,17 +272,58 @@ class UssdMenuView(View):
             )
         return "END Invalid choice."
 
-    def _handle_recommendations(self, segments):
+    def _handle_recommendations(self, subscriber, segments):
         if len(segments) == 1:
-            return "CON Select commodity\n1. Maize\n2. Rice\n0. Back"
+            commodity_lines = [f"{option}. {name}" for option, name in self._forecast_commodity_options()]
+            return (
+                "CON Select commodity\n"
+                + "\n".join(commodity_lines)
+                + "\n0. Back"
+            )
         if len(segments) == 2:
-            if segments[1] not in COMMODITY_MAP:
+            if segments[1] not in dict(self._forecast_commodity_options()):
                 return "END Invalid commodity selection."
-            return "CON Select need\n1. Best Time to Sell\n2. Best Market to Sell\n0. Back"
+            return self._recommendation_prompt_lines(subscriber)
         if len(segments) == 3:
-            return RECOMMENDATION_DATA.get(
-                (segments[1], segments[2]),
-                "END Invalid recommendation option.",
+            commodity = dict(self._forecast_commodity_options()).get(segments[1])
+            recommendation_type = {
+                "1": "time",
+                "2": "market",
+            }.get(segments[2])
+            if commodity is None:
+                return "END Invalid commodity selection."
+            if recommendation_type is None:
+                return "END Invalid recommendation option."
+
+            try:
+                recommendation = get_cached_recommendation(
+                    role=subscriber.role,
+                    commodity=commodity,
+                    recommendation_type=recommendation_type,
+                )
+            except LookupError:
+                return "END Recommendation not available right now."
+
+            if recommendation.recommendation_type == "time":
+                period_label = {
+                    "daily": "today",
+                    "weekly": "week",
+                    "monthly": "month",
+                    "seasonal": "season",
+                }.get(recommendation.period, recommendation.period)
+                return (
+                    "END Recommendation\n"
+                    f"{recommendation.summary}\n"
+                    f"Window: {period_label}\n"
+                    f"Season: {recommendation.season}\n"
+                    f"Trend: {recommendation.trend}\n"
+                    f"Reason: {recommendation.reason}"
+                )
+            return (
+                "END Recommendation\n"
+                f"{recommendation.summary}\n"
+                f"Trend: {recommendation.trend}\n"
+                f"Reason: {recommendation.reason}"
             )
         return "END Invalid choice."
 
@@ -416,7 +479,7 @@ class UssdMenuView(View):
         elif segments[0] == "2":
             response_text = self._handle_prediction(segments)
         elif segments[0] == "3":
-            response_text = self._handle_recommendations(segments)
+            response_text = self._handle_recommendations(subscriber, segments)
         elif segments[0] == "4":
             response_text = self._handle_account(subscriber, segments)
         else:

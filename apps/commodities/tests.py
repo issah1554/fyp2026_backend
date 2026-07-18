@@ -68,7 +68,8 @@ class CommodityApiTests(APITestCase):
         list_response = self.client.get("/api/v1/commodities/")
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)
         self.assertTrue(list_response.data["success"])
-        self.assertEqual(list_response.data["data"][0]["commodity_id"], commodity.public_id)
+        commodity_ids = [item["commodity_id"] for item in list_response.data["data"]]
+        self.assertIn(commodity.public_id, commodity_ids)
 
         detail_response = self.client.get(f"/api/v1/commodities/{commodity.public_id}/")
         self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
@@ -114,3 +115,8 @@ class CommodityApiTests(APITestCase):
         market_names = list(Market.objects.filter(is_active=True).values_list("name", flat=True))
         self.assertIn("Ifakara Central Market", market_names)
         self.assertIn("Morogoro Central Market", market_names)
+
+    def test_prediction_commodities_are_seeded(self):
+        commodity_names = list(Commodity.objects.filter(name__in=["Beans", "Rice"]).values_list("name", flat=True))
+        self.assertIn("Beans", commodity_names)
+        self.assertIn("Rice", commodity_names)

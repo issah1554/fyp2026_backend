@@ -6,16 +6,13 @@ from pathlib import Path
 from django.conf import settings
 from django.utils import timezone
 
-from apps.commodities.models import Market
+from apps.commodities.models import Commodity, Market
 
 
 MODEL_FILENAME = "morogoro_market_price_forecaster.joblib"
 DEFAULT_MODEL_PATH = Path(settings.BASE_DIR) / "apps" / "ussd" / "ml" / MODEL_FILENAME
 
-COMMODITY_MAP = {
-    "1": "Beans",
-    "2": "Rice",
-}
+SUPPORTED_PREDICTION_COMMODITIES = ("Beans", "Rice")
 
 PRICE_TYPE_MAP = {
     "1": ("Retail", "KG"),
@@ -165,6 +162,21 @@ class MarketPriceForecaster:
             .values_list("name", flat=True)
         )
         return [(str(index), name) for index, name in enumerate(markets, start=1)]
+
+    def get_supported_commodity_names(self) -> list[str]:
+        available_commodities = set(
+            Commodity.objects.filter(name__in=SUPPORTED_PREDICTION_COMMODITIES)
+            .values_list("name", flat=True)
+        )
+        return [
+            commodity
+            for commodity in SUPPORTED_PREDICTION_COMMODITIES
+            if commodity in available_commodities
+        ]
+
+    def get_commodity_options(self) -> list[tuple[str, str]]:
+        commodities = self.get_supported_commodity_names()
+        return [(str(index), name) for index, name in enumerate(commodities, start=1)]
 
     def _predict_daily(self, series_key: str, target_date: pd.Timestamp) -> float:
         import pandas as pd

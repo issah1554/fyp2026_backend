@@ -11,7 +11,12 @@ from apps.auth.models import Profile
 from apps.commodities.models import Market
 from apps.ussd.forecasting import calendar_week_end_date
 
-from .models import UssdMarketPrediction, UssdPriceAlert, UssdSubscriber
+from .models import (
+    UssdMarketPrediction,
+    UssdMarketRecommendation,
+    UssdPriceAlert,
+    UssdSubscriber,
+)
 
 
 class UssdMenuViewTests(TestCase):
@@ -170,6 +175,10 @@ class UssdMenuViewTests(TestCase):
             ("1", "Ifakara Central Market"),
             ("2", "Morogoro Central Market"),
         ]
+        mock_service_factory.return_value.get_commodity_options.return_value = [
+            ("1", "Beans"),
+            ("2", "Rice"),
+        ]
 
         response = self.client.post(
             reverse("ussd:menu"),
@@ -202,6 +211,10 @@ class UssdMenuViewTests(TestCase):
             ("1", "Ifakara Central Market"),
             ("2", "Morogoro Central Market"),
         ]
+        mock_service_factory.return_value.get_commodity_options.return_value = [
+            ("1", "Beans"),
+            ("2", "Rice"),
+        ]
 
         response = self.client.post(
             reverse("ussd:menu"),
@@ -225,6 +238,10 @@ class UssdMenuViewTests(TestCase):
         mock_service_factory.return_value.get_market_options.return_value = [
             ("1", "Ifakara Central Market"),
             ("2", "Morogoro Central Market"),
+        ]
+        mock_service_factory.return_value.get_commodity_options.return_value = [
+            ("1", "Beans"),
+            ("2", "Rice"),
         ]
 
         market_response = self.client.post(
@@ -265,9 +282,126 @@ class UssdMenuViewTests(TestCase):
         )
 
         self.assertContains(market_response, "Ifakara Central Market")
-        self.assertContains(commodity_response, "Select commodity")
+        self.assertContains(commodity_response, "Beans")
+        self.assertContains(commodity_response, "Rice")
         self.assertContains(type_response, "Select price type")
         self.assertContains(period_response, "Select period")
+
+    @patch("apps.ussd.views.get_forecast_service")
+    def test_buyer_can_get_cached_buy_recommendation(self, mock_service_factory):
+        subscriber = UssdSubscriber.objects.create(
+            phone_number="+254700000021",
+            full_name="Buyer User",
+            role=UssdSubscriber.Role.BUYER,
+        )
+        UssdMarketRecommendation.objects.create(
+            role=UssdMarketRecommendation.Role.BUYER,
+            commodity="Beans",
+            recommendation_type=UssdMarketRecommendation.RecommendationType.TIME,
+            action=UssdMarketRecommendation.Action.BUY,
+            target_date=timezone.localdate(),
+            period=UssdMarketRecommendation.Period.WEEKLY,
+            season="kiangazi kikuu",
+            trend=UssdMarketRecommendation.Trend.FALLING,
+            recommended_price="2450.00",
+            currency="TZS",
+            confidence="84.00",
+            summary="Wait to buy until this week.",
+            reason="Best buying window is this week in kiangazi kikuu.",
+        )
+        mock_service_factory.return_value.get_commodity_options.return_value = [
+            ("1", "Beans"),
+            ("2", "Rice"),
+        ]
+
+        response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession126",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": subscriber.phone_number,
+                "text": "3*1*1",
+            },
+        )
+
+        self.assertContains(response, "Wait to buy until this week.")
+        self.assertContains(response, "Window: week")
+        self.assertContains(response, "Trend: falling")
+        self.assertNotContains(response, "From:")
+        self.assertNotContains(response, "To:")
+        self.assertNotContains(response, "Price:")
+        self.assertNotContains(response, "Confidence:")
+        self.assertNotContains(response, "TZS")
+
+    @patch("apps.ussd.views.get_forecast_service")
+    def test_farmer_can_get_cached_sell_market_recommendation(self, mock_service_factory):
+        subscriber = UssdSubscriber.objects.create(
+            phone_number="+254700000022",
+            full_name="Farmer User",
+            role=UssdSubscriber.Role.FARMER,
+        )
+        market = Market.objects.get(name="Ifakara Central Market")
+        UssdMarketRecommendation.objects.create(
+            role=UssdMarketRecommendation.Role.FARMER,
+            commodity="Rice",
+            recommendation_type=UssdMarketRecommendation.RecommendationType.MARKET,
+            action=UssdMarketRecommendation.Action.SELL,
+            target_date=timezone.localdate(),
+            market=market,
+            period=UssdMarketRecommendation.Period.DAILY,
+            season="kiangazi kikuu",
+            trend=UssdMarketRecommendation.Trend.RISING,
+            recommended_price="2810.00",
+            currency="TZS",
+            confidence="79.00",
+            summary="Best market to sell is Ifakara Central Market.",
+            reason="This market has the highest predicted daily price.",
+        )
+        mock_service_factory.return_value.get_commodity_options.return_value = [
+            ("1", "Beans"),
+            ("2", "Rice"),
+        ]
+
+        response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession127",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": subscriber.phone_number,
+                "text": "3*2*2",
+            },
+        )
+
+        self.assertContains(response, "Best market to sell is Ifakara Central Market.")
+        self.assertContains(response, "Trend: rising")
+        self.assertNotContains(response, "Market: Ifakara Central Market")
+        self.assertNotContains(response, "Price:")
+        self.assertNotContains(response, "Confidence:")
+        self.assertNotContains(response, "TZS")
+
+    @patch("apps.ussd.views.get_forecast_service")
+    def test_recommendation_returns_not_available_when_cache_is_missing(self, mock_service_factory):
+        subscriber = UssdSubscriber.objects.create(
+            phone_number="+254700000023",
+            full_name="Buyer User",
+            role=UssdSubscriber.Role.BUYER,
+        )
+        mock_service_factory.return_value.get_commodity_options.return_value = [
+            ("1", "Beans"),
+            ("2", "Rice"),
+        ]
+
+        response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession128",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": subscriber.phone_number,
+                "text": "3*1*1",
+            },
+        )
+
+        self.assertContains(response, "END Recommendation not available right now.")
 
     def test_view_profile_shows_saved_price_alerts(self):
         user = get_user_model().objects.create(username="+254700000001")
@@ -402,6 +536,32 @@ class RefreshUssdPredictionsCommandTests(TestCase):
         output = stdout.getvalue()
         self.assertIn("Saved 12 cached USSD predictions for 2026-07-18.", output)
         self.assertIn("Skipped 4 prediction(s) for 2026-07-18.", output)
+
+
+class RefreshUssdRecommendationsCommandTests(TestCase):
+    @patch("apps.ussd.management.commands.refresh_ussd_recommendations.RecommendationRefreshService")
+    @patch("apps.ussd.management.commands.refresh_ussd_recommendations.get_forecast_service")
+    def test_refresh_recommendations_command_prints_results_and_summary(
+        self,
+        _mock_forecast_service,
+        mock_service_class,
+    ):
+        mock_service_class.return_value.refresh_for_date.return_value = {
+            "results": [object()] * 12,
+            "failures": [],
+        }
+        stdout = StringIO()
+
+        call_command(
+            "refresh_ussd_recommendations",
+            "--date",
+            "2026-07-18",
+            stdout=stdout,
+        )
+
+        output = stdout.getvalue()
+        self.assertIn("Starting cached USSD recommendation refresh...", output)
+        self.assertIn("Saved 12 cached USSD recommendations for 2026-07-18.", output)
 
 
 class ForecastingCalendarTests(SimpleTestCase):

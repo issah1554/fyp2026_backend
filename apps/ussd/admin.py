@@ -1,7 +1,12 @@
 
 from django.contrib import admin
 
-from .models import UssdMarketPrediction, UssdPriceAlert, UssdSubscriber
+from .models import (
+    UssdMarketPrediction,
+    UssdMarketRecommendation,
+    UssdPriceAlert,
+    UssdSubscriber,
+)
 
 
 @admin.register(UssdSubscriber)
@@ -31,3 +36,20 @@ class UssdMarketPredictionAdmin(admin.ModelAdmin):
     )
     search_fields = ("market__name", "commodity", "pricetype", "period")
     list_filter = ("commodity", "pricetype", "period", "market")
+
+
+@admin.register(UssdMarketRecommendation)
+class UssdMarketRecommendationAdmin(admin.ModelAdmin):
+    list_display = (
+        "role",
+        "commodity",
+        "recommendation_type",
+        "action",
+        "target_date",
+        "market",
+        "period",
+        "trend",
+        "confidence",
+    )
+    search_fields = ("role", "commodity", "recommendation_type", "market__name")
+    list_filter = ("role", "commodity", "recommendation_type", "action", "trend")
