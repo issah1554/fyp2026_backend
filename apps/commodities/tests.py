@@ -5,7 +5,7 @@ from rest_framework.test import APITestCase
 
 from apps.auth.models import Profile
 
-from .models import Commodity, CommodityCategory
+from .models import Commodity, CommodityCategory, Market
 
 
 class CommodityApiTests(APITestCase):
@@ -109,3 +109,8 @@ class CommodityApiTests(APITestCase):
         delete_response = self.client.delete(f"/api/v1/commodities/{commodity.public_id}/")
         self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
         self.assertFalse(Commodity.objects.filter(public_id=commodity.public_id).exists())
+
+    def test_prediction_markets_are_seeded(self):
+        market_names = list(Market.objects.filter(is_active=True).values_list("name", flat=True))
+        self.assertIn("Ifakara Central Market", market_names)
+        self.assertIn("Morogoro Central Market", market_names)

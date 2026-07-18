@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Commodity, CommodityCategory, CommodityCategoryMap
+from .models import Commodity, CommodityCategory, CommodityCategoryMap, Market
 
 
 class CommodityCategoryMapInline(admin.TabularInline):
@@ -28,3 +28,10 @@ class CommodityCategoryMapAdmin(admin.ModelAdmin):
     list_display = ("commodity", "category", "created_at")
     search_fields = ("commodity__name", "category__name")
     readonly_fields = ("created_at",)
+
+
+@admin.register(Market)
+class MarketAdmin(admin.ModelAdmin):
+    list_display = ("public_id", "name", "is_active", "created_at")
+    search_fields = ("public_id", "name")
+    readonly_fields = ("public_id", "created_at")

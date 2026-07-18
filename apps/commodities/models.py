@@ -24,6 +24,26 @@ class CommodityCategory(models.Model):
         return self.name
 
 
+class Market(models.Model):
+    public_id = models.CharField(max_length=10, unique=True, editable=False)
+    name = models.CharField(max_length=150, unique=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def save(self, *args, **kwargs):
+        if not self.public_id:
+            self.public_id = generate_unique_public_id(Market)
+            if kwargs.get("update_fields") is not None:
+                kwargs["update_fields"] = set(kwargs["update_fields"]) | {"public_id"}
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+
 class Commodity(models.Model):
     public_id = models.CharField(max_length=10, unique=True, editable=False)
     name = models.CharField(max_length=150)

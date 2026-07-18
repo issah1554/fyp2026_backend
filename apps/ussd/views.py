@@ -9,6 +9,13 @@ from django.views.decorators.csrf import csrf_exempt
 
 from apps.auth.models import Profile
 
+from .forecasting import (
+    COMMODITY_MAP as PREDICTION_COMMODITY_MAP,
+    ForecastUnavailable,
+    PERIOD_MAP as FORECAST_PERIOD_MAP,
+    PRICE_TYPE_MAP,
+    get_forecast_service,
+)
 from .models import UssdPriceAlert, UssdSubscriber
 
 User = get_user_model()
@@ -93,6 +100,9 @@ class UssdMenuView(View):
     def _is_exit(self, segments):
         return segments == ["0"]
 
+    def _forecast_market_options(self):
+        return get_forecast_service().get_market_options()
+
     def _split_name(self, full_name):
         name_parts = full_name.split()
         if not name_parts:
@@ -170,21 +180,70 @@ class UssdMenuView(View):
 
     def _handle_prediction(self, segments):
         if len(segments) == 1:
+            market_lines = [f"{option}. {name}" for option, name in self._forecast_market_options()]
             return (
-                "CON Select time period\n"
-                "1. Next 7 Days\n"
-                "2. Next Month\n"
-                "3. Next Season\n"
-                "0. Back"
+                "CON Select market\n"
+                + "\n".join(market_lines)
+                + "\n0. Back"
             )
         if len(segments) == 2:
-            if segments[1] not in {"1", "2", "3"}:
-                return "END Invalid time period."
-            return "CON Select commodity\n1. Maize\n2. Rice\n0. Back"
+            market_lookup = dict(self._forecast_market_options())
+            if segments[1] not in market_lookup:
+                return "END Invalid market selection."
+            return "CON Select commodity\n1. Beans\n2. Rice\n0. Back"
         if len(segments) == 3:
-            return PREDICTION_DATA.get(
-                (segments[1], segments[2]),
-                "END Invalid commodity selection.",
+            if segments[2] not in PREDICTION_COMMODITY_MAP:
+                return "END Invalid commodity selection."
+            return "CON Select price type\n1. Retail\n2. Wholesale\n0. Back"
+        if len(segments) == 4:
+            if segments[3] not in PRICE_TYPE_MAP:
+                return "END Invalid price type."
+            return (
+                "CON Select period\n"
+                "1. Daily\n"
+                "2. Weekly\n"
+                "3. Monthly\n"
+                "4. Seasonal\n"
+                "0. Back"
+            )
+        if len(segments) == 5:
+            market = dict(self._forecast_market_options()).get(segments[1])
+            commodity = PREDICTION_COMMODITY_MAP.get(segments[2])
+            price_type = PRICE_TYPE_MAP.get(segments[3])
+            period = FORECAST_PERIOD_MAP.get(segments[4])
+            if market is None:
+                return "END Invalid market selection."
+            if commodity is None:
+                return "END Invalid commodity selection."
+            if price_type is None:
+                return "END Invalid price type."
+            if period is None:
+                return "END Invalid period selection."
+
+            try:
+                result = get_forecast_service().predict(
+                    market=market,
+                    commodity=commodity,
+                    pricetype=price_type[0],
+                    unit=price_type[1],
+                    period=period,
+                )
+            except ForecastUnavailable as exc:
+                return f"END Prediction unavailable. {exc}"
+
+            period_label = {
+                "daily": f"Day: {result.target_date}",
+                "weekly": f"Week: {result.target_date} to {result.period_end}",
+                "monthly": f"Month: {result.target_date} to {result.period_end}",
+                "seasonal": f"Season: {result.season} ({result.target_date} to {result.period_end})",
+            }[result.period]
+            return (
+                "END Predicted Price\n"
+                f"Market: {result.market}\n"
+                f"Commodity: {result.commodity}\n"
+                f"Type: {result.pricetype} ({result.unit})\n"
+                f"{period_label}\n"
+                f"Price: {result.currency} {result.predicted_price:,.2f}"
             )
         return "END Invalid choice."
 
@@ -251,6 +310,12 @@ class UssdMenuView(View):
         )
 
     def _view_profile_response(self, subscriber, profile):
+        saved_alerts = {
+            alert.commodity: alert.target_price
+            for alert in subscriber.price_alerts.filter(is_active=True)
+        }
+        maize_alert = saved_alerts.get(UssdPriceAlert.Commodity.MAIZE)
+        rice_alert = saved_alerts.get(UssdPriceAlert.Commodity.RICE)
         message = (
             f"END Name: {subscriber.full_name}, Role: {subscriber.get_role_display()}, "
             f"Phone: {subscriber.phone_number}"
@@ -259,6 +324,9 @@ class UssdMenuView(View):
             farm_location = profile.farm_location or "Not set"
             farm_group = profile.farm_group or "Not set"
             message += f", Farm Location: {farm_location}, Farm Group: {farm_group}"
+        maize_alert_text = f"TZS {maize_alert:.2f}" if maize_alert is not None else "Not set"
+        rice_alert_text = f"TZS {rice_alert:.2f}" if rice_alert is not None else "Not set"
+        message += f", Maize Alert: {maize_alert_text}, Rice Alert: {rice_alert_text}"
         return message
 
     def _handle_account(self, subscriber, segments):
