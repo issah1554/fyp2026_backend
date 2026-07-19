@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 from apps.common.ids import generate_unique_public_id
@@ -87,3 +88,49 @@ class CommodityCategoryMap(models.Model):
 
     def __str__(self):
         return f"{self.commodity} -> {self.category}"
+
+
+class MarketPriceRecord(models.Model):
+    class PriceType(models.TextChoices):
+        RETAIL = "Retail", "Retail"
+        WHOLESALE = "Wholesale", "Wholesale"
+
+    public_id = models.CharField(max_length=10, unique=True, editable=False)
+    market = models.ForeignKey(
+        Market,
+        on_delete=models.PROTECT,
+        related_name="price_records",
+    )
+    commodity = models.ForeignKey(
+        Commodity,
+        on_delete=models.PROTECT,
+        related_name="price_records",
+    )
+    price_type = models.CharField(max_length=32, choices=PriceType.choices)
+    unit = models.CharField(max_length=32)
+    price = models.DecimalField(max_digits=14, decimal_places=2)
+    currency = models.CharField(max_length=16, default="TZS")
+    record_date = models.DateField()
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="market_price_records",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-record_date", "market__name", "commodity__name"]
+
+    def save(self, *args, **kwargs):
+        if not self.public_id:
+            self.public_id = generate_unique_public_id(MarketPriceRecord)
+            if kwargs.get("update_fields") is not None:
+                kwargs["update_fields"] = set(kwargs["update_fields"]) | {"public_id"}
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.market} | {self.commodity} | {self.record_date}"

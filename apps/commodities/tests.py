@@ -5,7 +5,7 @@ from rest_framework.test import APITestCase
 
 from apps.auth.models import Profile
 
-from .models import Commodity, CommodityCategory, Market
+from .models import Commodity, CommodityCategory, Market, MarketPriceRecord
 
 
 class CommodityApiTests(APITestCase):
@@ -120,3 +120,57 @@ class CommodityApiTests(APITestCase):
         commodity_names = list(Commodity.objects.filter(name__in=["Beans", "Rice"]).values_list("name", flat=True))
         self.assertIn("Beans", commodity_names)
         self.assertIn("Rice", commodity_names)
+
+    def test_market_officer_can_manage_market_price_records(self):
+        officer = get_user_model().objects.create_user(
+            username="officer",
+            email="officer@example.com",
+            password="StrongPass123",
+        )
+        Profile.objects.create(
+            user=officer,
+            role=Profile.Role.MARKET_OFFICER,
+            email_verified_at=timezone.now(),
+        )
+        self.client.force_authenticate(officer)
+        market = Market.objects.get(name="Ifakara Central Market")
+        commodity = Commodity.objects.get(name="Rice")
+
+        market_response = self.client.get("/api/v1/commodities/markets/")
+        self.assertEqual(market_response.status_code, status.HTTP_200_OK)
+        self.assertIn(market.public_id, [item["market_id"] for item in market_response.data["data"]])
+
+        create_response = self.client.post(
+            "/api/v1/commodities/market-records/",
+            {
+                "market_id": market.public_id,
+                "commodity_id": commodity.public_id,
+                "price_type": "Retail",
+                "unit": "KG",
+                "price": "2800.00",
+                "record_date": "2026-07-18",
+                "notes": "Morning collection",
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        record_id = create_response.data["data"]["record_id"]
+        self.assertEqual(create_response.data["data"]["market"]["name"], "Ifakara Central Market")
+        self.assertEqual(create_response.data["data"]["commodity"]["name"], "Rice")
+        self.assertEqual(MarketPriceRecord.objects.get(public_id=record_id).created_by, officer)
+
+        update_response = self.client.patch(
+            f"/api/v1/commodities/market-records/{record_id}/",
+            {"price": "2850.00", "notes": "Verified afternoon update"},
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(update_response.data["data"]["price"], "2850.00")
+
+        list_response = self.client.get("/api/v1/commodities/market-records/")
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertIn(record_id, [item["record_id"] for item in list_response.data["data"]])
+
+        delete_response = self.client.delete(f"/api/v1/commodities/market-records/{record_id}/")
+        self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
+        self.assertFalse(MarketPriceRecord.objects.filter(public_id=record_id).exists())
