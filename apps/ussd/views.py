@@ -20,6 +20,11 @@ from .forecasting import (
 from .models import UssdPriceAlert, UssdSubscriber
 from .prediction_cache import get_cached_prediction
 from .recommendations import get_cached_recommendation
+from .weather import (
+    WeatherForecastUnavailable,
+    get_weather_region_options,
+    get_weather_service,
+)
 
 User = get_user_model()
 
@@ -79,7 +84,8 @@ class UssdMenuView(View):
             "1. Market Prices\n"
             "2. Price Prediction\n"
             "3. My Recommendations\n"
-            "4. My Account\n"
+            "4. Weather Forecast\n"
+            "5. My Account\n"
             "0. Exit"
         )
 
@@ -327,6 +333,36 @@ class UssdMenuView(View):
             )
         return "END Invalid choice."
 
+    def _handle_weather_forecast(self, segments):
+        region_options = get_weather_region_options()
+        if len(segments) == 1:
+            region_lines = [f"{option}. {region.name}" for option, region in region_options]
+            return "CON Select region\n" + "\n".join(region_lines) + "\n0. Back"
+
+        if len(segments) == 2:
+            region = dict(region_options).get(segments[1])
+            if region is None:
+                return "END Invalid region selection."
+            try:
+                forecast = get_weather_service().fetch_weekly_forecast(region)
+            except WeatherForecastUnavailable:
+                return "END Weather forecast not available right now."
+
+            day_lines = [
+                (
+                    f"{day['weekday']}: {day['condition']}, "
+                    f"{day['guidance']}, {day['temperature']}"
+                )
+                for day in forecast["days"]
+            ]
+            return (
+                "END Weather Forecast\n"
+                f"Region: {forecast['region']}\n"
+                f"Season: {forecast['season']}\n"
+                + "\n".join(day_lines)
+            )
+        return "END Invalid choice."
+
     def _profile_for_subscriber(self, subscriber):
         if subscriber.user_id:
             profile, _created = Profile.objects.get_or_create(
@@ -481,6 +517,8 @@ class UssdMenuView(View):
         elif segments[0] == "3":
             response_text = self._handle_recommendations(subscriber, segments)
         elif segments[0] == "4":
+            response_text = self._handle_weather_forecast(segments)
+        elif segments[0] == "5":
             response_text = self._handle_account(subscriber, segments)
         else:
             response_text = "END Invalid choice. Please try again."

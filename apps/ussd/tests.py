@@ -100,7 +100,7 @@ class UssdMenuViewTests(TestCase):
                 "sessionId": "ATUssdSession123",
                 "serviceCode": "*384*83342#",
                 "phoneNumber": subscriber.phone_number,
-                "text": "4*4*Kilombero",
+                "text": "5*4*Kilombero",
             },
         )
 
@@ -110,7 +110,7 @@ class UssdMenuViewTests(TestCase):
                 "sessionId": "ATUssdSession123",
                 "serviceCode": "*384*83342#",
                 "phoneNumber": subscriber.phone_number,
-                "text": "4*5*Mlima Group",
+                "text": "5*5*Mlima Group",
             },
         )
 
@@ -142,7 +142,7 @@ class UssdMenuViewTests(TestCase):
                 "sessionId": "ATUssdSession123",
                 "serviceCode": "*384*83342#",
                 "phoneNumber": subscriber.phone_number,
-                "text": "4*1",
+                "text": "5*1",
             },
         )
 
@@ -403,6 +403,69 @@ class UssdMenuViewTests(TestCase):
 
         self.assertContains(response, "END Recommendation not available right now.")
 
+    def test_weather_menu_lists_supported_regions(self):
+        subscriber = UssdSubscriber.objects.create(
+            phone_number="+254700000024",
+            full_name="Weather User",
+            role=UssdSubscriber.Role.FARMER,
+        )
+
+        response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession129",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": subscriber.phone_number,
+                "text": "4",
+            },
+        )
+
+        self.assertContains(response, "CON Select region")
+        self.assertContains(response, "Dar es Salaam")
+        self.assertContains(response, "Morogoro")
+
+    @patch("apps.ussd.views.get_weather_service")
+    def test_weather_forecast_shows_season_and_weekly_forecast(self, mock_weather_service):
+        subscriber = UssdSubscriber.objects.create(
+            phone_number="+254700000025",
+            full_name="Weather User",
+            role=UssdSubscriber.Role.FARMER,
+        )
+        mock_weather_service.return_value.fetch_weekly_forecast.return_value = {
+            "region": "Morogoro",
+            "season": "kiangazi kikuu",
+            "days": [
+                {
+                    "weekday": "Monday",
+                    "condition": "Sunny",
+                    "guidance": "low rain",
+                    "temperature": "21-30C",
+                },
+                {
+                    "weekday": "Tuesday",
+                    "condition": "Cloudy",
+                    "guidance": "possible rain",
+                    "temperature": "20-28C",
+                },
+            ],
+        }
+
+        response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession130",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": subscriber.phone_number,
+                "text": "4*2",
+            },
+        )
+
+        self.assertContains(response, "END Weather Forecast")
+        self.assertContains(response, "Region: Morogoro")
+        self.assertContains(response, "Season: kiangazi kikuu")
+        self.assertContains(response, "Monday: Sunny, low rain, 21-30C")
+        self.assertContains(response, "Tuesday: Cloudy, possible rain, 20-28C")
+
     def test_view_profile_shows_saved_price_alerts(self):
         user = get_user_model().objects.create(username="+254700000001")
         Profile.objects.create(
@@ -433,7 +496,7 @@ class UssdMenuViewTests(TestCase):
                 "sessionId": "ATUssdSession123",
                 "serviceCode": "*384*83342#",
                 "phoneNumber": subscriber.phone_number,
-                "text": "4*1",
+                "text": "5*1",
             },
         )
 
@@ -453,7 +516,7 @@ class UssdMenuViewTests(TestCase):
                 "sessionId": "ATUssdSession123",
                 "serviceCode": "*384*83342#",
                 "phoneNumber": subscriber.phone_number,
-                "text": "4*3*1*950",
+                "text": "5*3*1*950",
             },
         )
 
