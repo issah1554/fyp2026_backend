@@ -53,6 +53,51 @@ class UssdMenuViewTests(TestCase):
         self.assertEqual(profile.role, Profile.Role.FARMER)
         self.assertEqual(profile.phone_number, "+254700000001")
 
+    @patch("apps.ussd.views.get_forecast_service")
+    def test_newly_registered_user_can_continue_to_prediction_menu(self, mock_service_factory):
+        mock_service_factory.return_value.get_market_options.return_value = [
+            ("1", "Ifakara Central Market"),
+            ("2", "Morogoro Central Market"),
+        ]
+        mock_service_factory.return_value.get_commodity_options.return_value = [
+            ("1", "Beans"),
+            ("2", "Rice"),
+        ]
+
+        registration_response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession123",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": "+254700000001",
+                "text": "Jane Farmer*1",
+            },
+        )
+        prediction_response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession123",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": "+254700000001",
+                "text": "Jane Farmer*1*2",
+            },
+        )
+        commodity_response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession123",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": "+254700000001",
+                "text": "Jane Farmer*1*2*1",
+            },
+        )
+
+        self.assertContains(registration_response, "CON Main Menu")
+        self.assertContains(prediction_response, "CON Select market")
+        self.assertContains(prediction_response, "Ifakara Central Market")
+        self.assertContains(commodity_response, "CON Select commodity")
+        self.assertContains(commodity_response, "Beans")
+
     def test_registration_flow_supports_buyer_and_entrepreneur_roles(self):
         entrepreneur_response = self.client.post(
             reverse("ussd:menu"),

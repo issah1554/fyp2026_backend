@@ -92,6 +92,14 @@ class UssdMenuView(View):
     def _is_exit(self, segments):
         return segments == ["0"]
 
+    def _strip_completed_registration_segments(self, subscriber, segments):
+        if len(segments) < 3:
+            return segments
+        selected_role = ROLE_MAP.get(segments[1])
+        if segments[0] == subscriber.full_name and selected_role == subscriber.role:
+            return segments[2:]
+        return segments
+
     def _forecast_market_options(self):
         return get_forecast_service().get_market_options()
 
@@ -503,6 +511,8 @@ class UssdMenuView(View):
         _ = session_id, service_code, phone_number
         segments = self._normalize_segments(text)
         subscriber = UssdSubscriber.objects.select_related("user").filter(phone_number=phone_number).first()
+        if subscriber is not None:
+            segments = self._strip_completed_registration_segments(subscriber, segments)
 
         if self._is_exit(segments):
             response_text = "END Thank you for using SmartMarket DSS. Asante! Kwa heri."
