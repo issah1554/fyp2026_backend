@@ -27,7 +27,6 @@ class Profile(models.Model):
         BUYER = "buyer", "Buyer"
         MARKET_OFFICER = "market_officer", "Market Officer"
         ADMIN = "admin", "Administrator"
-        RESEARCHER = "researcher", "Researcher"
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,

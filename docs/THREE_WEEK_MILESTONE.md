@@ -38,7 +38,7 @@ Related objectives:
 ### Tasks
 
 - Review and stabilize existing authentication and user management APIs.
-- Confirm role permissions for admin, market officer, farmer, entrepreneur, buyer, and researcher.
+- Confirm role permissions for admin, market officer, farmer, entrepreneur, and buyer.
 - Finalize the commodity and administrative area models.
 - Add or refine market-related models:
   - Market

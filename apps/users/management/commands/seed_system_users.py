@@ -56,15 +56,6 @@ SAMPLE_USERS = [
         "organization": "Market Office",
         "is_staff": True,
     },
-    {
-        "username": "researcher_sample",
-        "email": "system.researcher@user.com",
-        "first_name": "David",
-        "last_name": "Researcher",
-        "role": Profile.Role.RESEARCHER,
-        "phone_number": "+255700000006",
-        "organization": "DIT Research Unit",
-    },
 ]
 
 

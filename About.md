@@ -105,7 +105,6 @@ To develop a Smart Market and Price Decision Support System that collects, analy
 * Buyers
 * Market Officers
 * Administrators
-* Researchers and Policy Makers
 
 ---
 

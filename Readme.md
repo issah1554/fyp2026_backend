@@ -270,7 +270,6 @@ farmer_sample          system.farmer@user.com
 entrepreneur_sample    system.entrepreneur@user.com
 buyer_sample           system.buyer@user.com
 market_officer_sample  system.market_officer@user.com
-researcher_sample      system.researcher@user.com
 ```
 
 ## Useful Django Shell Commands

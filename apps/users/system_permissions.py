@@ -45,7 +45,6 @@ SYSTEM_ROLES = [
     ("entrepreneur", "Entrepreneur", "Trading and selling role.", True),
     ("buyer", "Buyer", "Commodity purchasing role.", True),
     ("market_officer", "Market Officer", "Market data collection and validation role.", True),
-    ("researcher", "Researcher", "Read-oriented analysis role.", True),
 ]
 
 DEFAULT_ROLE_PERMISSIONS = {
@@ -92,13 +91,5 @@ DEFAULT_ROLE_PERMISSIONS = {
         "areas.create",
         "areas.bulk_import",
         "areas.update",
-    ],
-    "researcher": [
-        "auth.me",
-        "auth.logout",
-        "commodities.list",
-        "commodities.read",
-        "orders.list",
-        "orders.read",
     ],
 }

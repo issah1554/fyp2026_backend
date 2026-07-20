@@ -419,7 +419,6 @@ components:
         - buyer
         - market_officer
         - admin
-        - researcher
     Profile:
       type: object
       required: [role, phone_number, organization]
