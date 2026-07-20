@@ -19,6 +19,7 @@ class AdmAreaSerializer(serializers.ModelSerializer):
         model = AdmArea
         fields = ["area_id", "name", "parent_id", "parent", "level", "created_at"]
         read_only_fields = ["area_id", "parent", "created_at"]
+        validators = []
 
     @extend_schema_field(serializers.DictField)
     def get_parent(self, obj):
@@ -40,8 +41,16 @@ class AdmAreaSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         level = attrs.get("level", getattr(self.instance, "level", AdmArea.Level.REGION))
+        name = attrs.get("name", getattr(self.instance, "name", None))
         parent = attrs.get("parent_id", getattr(self.instance, "parent", None))
         expected_parent_level = AREA_PARENT_LEVELS.get(level)
+        duplicate = AdmArea.objects.filter(level=level, name=name)
+        if self.instance is not None:
+            duplicate = duplicate.exclude(pk=self.instance.pk)
+        if name and duplicate.exists():
+            raise serializers.ValidationError(
+                {"name": "An administrative area with this level and name already exists."}
+            )
 
         if expected_parent_level is None:
             if parent is not None:

@@ -31,6 +31,9 @@ class AdmArea(models.Model):
         indexes = [
             models.Index(fields=["parent", "level", "name"], name="adm_areas_path_idx"),
         ]
+        constraints = [
+            models.UniqueConstraint(fields=["level", "name"], name="adm_areas_level_name_uniq"),
+        ]
 
     def save(self, *args, **kwargs):
         if not self.public_id:
