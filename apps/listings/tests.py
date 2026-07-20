@@ -48,7 +48,7 @@ class ListingsApiTests(APITestCase):
         self.client.force_authenticate(self.farmer)
         
         create_response = self.client.post(
-            "/api/v1/listings/",
+            "/api/v1/listings",
             {
                 "commodity_id": self.commodity.public_id,
                 "adm_area_id": area.public_id,
@@ -69,13 +69,13 @@ class ListingsApiTests(APITestCase):
         self.assertTrue(create_response.data["data"]["images"][0]["is_primary"])
 
         # List listings
-        list_response = self.client.get("/api/v1/listings/")
+        list_response = self.client.get("/api/v1/listings")
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)
         self.assertGreaterEqual(len(list_response.data["data"]), 1)
 
         # Update listing
         update_response = self.client.patch(
-            f"/api/v1/listings/{listing_id}/",
+            f"/api/v1/listings/{listing_id}",
             {
                 "price": "4800.00",
                 "status": "active"
@@ -86,6 +86,6 @@ class ListingsApiTests(APITestCase):
         self.assertEqual(update_response.data["data"]["price"], "4800.00")
 
         # Delete listing
-        delete_response = self.client.delete(f"/api/v1/listings/{listing_id}/")
+        delete_response = self.client.delete(f"/api/v1/listings/{listing_id}")
         self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
         self.assertFalse(CommodityListing.objects.filter(public_id=listing_id).exists())

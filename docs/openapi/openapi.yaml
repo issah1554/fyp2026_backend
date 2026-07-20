@@ -16,7 +16,7 @@ tags:
   - name: Commodities
     description: Commodity catalog management.
 paths:
-  /auth/register/:
+  /auth/register:
     post:
       tags: [Auth]
       summary: Register a user
@@ -46,7 +46,7 @@ paths:
                 $ref: "#/components/schemas/User"
         "400":
           $ref: "#/components/responses/ValidationError"
-  /auth/login/:
+  /auth/login:
     post:
       tags: [Auth]
       summary: Login and receive JWT tokens
@@ -70,7 +70,7 @@ paths:
                 $ref: "#/components/schemas/TokenPair"
         "401":
           description: Invalid credentials.
-  /auth/token/refresh/:
+  /auth/token/refresh:
     post:
       tags: [Auth]
       summary: Refresh an access token
@@ -91,7 +91,7 @@ paths:
                 $ref: "#/components/schemas/TokenRefreshResponse"
         "401":
           description: Refresh token is invalid or expired.
-  /auth/me/:
+  /auth/me:
     get:
       tags: [Auth]
       summary: Get the current user
@@ -105,7 +105,7 @@ paths:
                 $ref: "#/components/schemas/User"
         "401":
           $ref: "#/components/responses/Unauthorized"
-  /auth/logout/:
+  /auth/logout:
     post:
       tags: [Auth]
       summary: Logout the current user
@@ -124,7 +124,7 @@ paths:
                     example: Logout successful. Discard the access and refresh tokens on the client.
         "401":
           $ref: "#/components/responses/Unauthorized"
-  /users/:
+  /users:
     get:
       tags: [Users]
       summary: List users
@@ -161,7 +161,7 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "403":
           $ref: "#/components/responses/Forbidden"
-  /users/{user_id}/:
+  /users/{user_id}:
     parameters:
       - name: user_id
         in: path
@@ -220,7 +220,7 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
-  /commodities/categories/:
+  /commodities/categories:
     get:
       tags: [Commodity Categories]
       summary: List commodity categories
@@ -257,7 +257,7 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "403":
           $ref: "#/components/responses/Forbidden"
-  /commodities/categories/{category_id}/:
+  /commodities/categories/{category_id}:
     parameters:
       - name: category_id
         in: path
@@ -312,7 +312,7 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
-  /commodities/:
+  /commodities:
     get:
       tags: [Commodities]
       summary: List commodities
@@ -349,7 +349,7 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "403":
           $ref: "#/components/responses/Forbidden"
-  /commodities/{commodity_id}/:
+  /commodities/{commodity_id}:
     parameters:
       - name: commodity_id
         in: path

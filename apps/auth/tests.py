@@ -14,7 +14,7 @@ from .models import EmailVerificationToken, PasswordResetToken, Profile
 class AuthApiTests(APITestCase):
     def test_user_can_register(self):
         response = self.client.post(
-            "/api/v1/auth/register/",
+            "/api/v1/auth/register",
             {
                 "username": "amina",
                 "email": "amina@example.com",
@@ -57,7 +57,7 @@ class AuthApiTests(APITestCase):
 
     def test_registration_verification_email_uses_request_origin(self):
         response = self.client.post(
-            "/api/v1/auth/register/",
+            "/api/v1/auth/register",
             {
                 "username": "verceluser",
                 "email": "vercel@example.com",
@@ -79,7 +79,7 @@ class AuthApiTests(APITestCase):
 
     def test_registration_validation_errors_use_response_schema(self):
         response = self.client.post(
-            "/api/v1/auth/register/",
+            "/api/v1/auth/register",
             {
                 "username": "",
                 "email": "not-an-email",
@@ -100,7 +100,7 @@ class AuthApiTests(APITestCase):
 
     def test_registration_rejects_invalid_phone_number(self):
         response = self.client.post(
-            "/api/v1/auth/register/",
+            "/api/v1/auth/register",
             {
                 "username": "invalidphone",
                 "email": "invalidphone@example.com",
@@ -123,7 +123,7 @@ class AuthApiTests(APITestCase):
         )
 
         response = self.client.post(
-            "/api/v1/auth/register/",
+            "/api/v1/auth/register",
             {
                 "username": "newuser",
                 "email": "existing@example.com",
@@ -152,7 +152,7 @@ class AuthApiTests(APITestCase):
         )
 
         response = self.client.post(
-            "/api/v1/auth/email/verify/",
+            "/api/v1/auth/email/verify",
             {"token": verification_token.token},
             format="json",
         )
@@ -172,7 +172,7 @@ class AuthApiTests(APITestCase):
         )
 
         response = self.client.post(
-            "/api/v1/auth/login/",
+            "/api/v1/auth/login",
             {"username": "marketofficer", "password": "StrongPass123"},
             format="json",
         )
@@ -183,7 +183,7 @@ class AuthApiTests(APITestCase):
 
     def test_invalid_login_uses_generic_invalid_credentials_message(self):
         response = self.client.post(
-            "/api/v1/auth/login/",
+            "/api/v1/auth/login",
             {"username": "missing", "password": "wrong"},
             format="json",
         )
@@ -202,7 +202,7 @@ class AuthApiTests(APITestCase):
         Profile.objects.create(user=user, email_verified_at=timezone.now())
 
         login_response = self.client.post(
-            "/api/v1/auth/login/",
+            "/api/v1/auth/login",
             {"username": "marketofficer", "password": "StrongPass123"},
             format="json",
         )
@@ -216,7 +216,7 @@ class AuthApiTests(APITestCase):
         self.assertNotIn("id", login_response.data["data"]["user"])
 
         refresh_response = self.client.post(
-            "/api/v1/auth/token/refresh/",
+            "/api/v1/auth/token/refresh",
             {"refresh": login_response.data["data"]["refresh"]},
             format="json",
         )
@@ -226,7 +226,7 @@ class AuthApiTests(APITestCase):
         self.assertIn("access", refresh_response.data["data"])
 
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_response.data['data']['access']}")
-        me_response = self.client.get("/api/v1/auth/me/")
+        me_response = self.client.get("/api/v1/auth/me")
         self.assertEqual(me_response.status_code, status.HTTP_200_OK)
         self.assertTrue(me_response.data["success"])
         self.assertEqual(me_response.data["data"]["username"], "marketofficer")
@@ -241,7 +241,7 @@ class AuthApiTests(APITestCase):
         Profile.objects.create(user=user, email_verified_at=timezone.now())
 
         response = self.client.post(
-            "/api/v1/auth/login/",
+            "/api/v1/auth/login",
             {"username": "officer@example.com", "password": "StrongPass123"},
             format="json",
         )
@@ -258,7 +258,7 @@ class AuthApiTests(APITestCase):
         )
 
         response = self.client.post(
-            "/api/v1/auth/email/resend/",
+            "/api/v1/auth/email/resend",
             {"email": "amina@example.com"},
             HTTP_ORIGIN="https://fyp2026-web.vercel.app",
             format="json",
@@ -282,7 +282,7 @@ class AuthApiTests(APITestCase):
         )
 
         response = self.client.post(
-            "/api/v1/auth/password/reset/request/",
+            "/api/v1/auth/password/reset/request",
             {"email": "amina@example.com"},
             format="json",
         )
@@ -295,7 +295,7 @@ class AuthApiTests(APITestCase):
 
     def test_password_reset_request_does_not_reveal_missing_account(self):
         response = self.client.post(
-            "/api/v1/auth/password/reset/request/",
+            "/api/v1/auth/password/reset/request",
             {"email": "missing@example.com"},
             format="json",
         )
@@ -319,7 +319,7 @@ class AuthApiTests(APITestCase):
         )
 
         response = self.client.post(
-            "/api/v1/auth/password/reset/confirm/",
+            "/api/v1/auth/password/reset/confirm",
             {"token": reset_token.token, "password": "NewStrongPass123"},
             format="json",
         )
@@ -333,7 +333,7 @@ class AuthApiTests(APITestCase):
         self.assertTrue(user.check_password("NewStrongPass123"))
 
     def test_me_requires_authentication(self):
-        response = self.client.get("/api/v1/auth/me/")
+        response = self.client.get("/api/v1/auth/me")
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertFalse(response.data["success"])
@@ -352,7 +352,7 @@ class AuthApiTests(APITestCase):
         self.client.force_authenticate(user=user)
 
         response = self.client.delete(
-            "/api/v1/auth/me/",
+            "/api/v1/auth/me",
             {
                 "password": "StrongPass123",
                 "confirmation": "DELETE MY ACCOUNT",
@@ -367,7 +367,7 @@ class AuthApiTests(APITestCase):
         self.assertFalse(Profile.objects.filter(user_id=user.pk).exists())
 
     def test_account_deletion_requires_authentication(self):
-        response = self.client.delete("/api/v1/auth/me/")
+        response = self.client.delete("/api/v1/auth/me")
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertFalse(response.data["success"])
@@ -383,7 +383,7 @@ class AuthApiTests(APITestCase):
         self.client.force_authenticate(user=user)
 
         response = self.client.delete(
-            "/api/v1/auth/me/",
+            "/api/v1/auth/me",
             {
                 "password": "WrongPass123",
                 "confirmation": "DELETE MY ACCOUNT",
@@ -406,7 +406,7 @@ class AuthApiTests(APITestCase):
         self.client.force_authenticate(user=user)
 
         response = self.client.delete(
-            "/api/v1/auth/me/",
+            "/api/v1/auth/me",
             {
                 "password": "StrongPass123",
                 "confirmation": "delete my account",

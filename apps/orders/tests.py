@@ -66,7 +66,7 @@ class OrdersApiTests(APITestCase):
         
         # Place order
         create_response = self.client.post(
-            "/api/v1/orders/",
+            "/api/v1/orders",
             {
                 "listing_id": self.listing.public_id,
                 "quantity": "20.00",
@@ -87,17 +87,17 @@ class OrdersApiTests(APITestCase):
 
         # Verify participant permissions
         # Buyer should be able to view details
-        detail_response = self.client.get(f"/api/v1/orders/{order_id}/")
+        detail_response = self.client.get(f"/api/v1/orders/{order_id}")
         self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
 
         # Seller (farmer) should be able to view details
         self.client.force_authenticate(self.farmer)
-        seller_detail_response = self.client.get(f"/api/v1/orders/{order_id}/")
+        seller_detail_response = self.client.get(f"/api/v1/orders/{order_id}")
         self.assertEqual(seller_detail_response.status_code, status.HTTP_200_OK)
 
         # Unrelated user should NOT be able to view details
         self.client.force_authenticate(self.other_user)
-        other_detail_response = self.client.get(f"/api/v1/orders/{order_id}/")
+        other_detail_response = self.client.get(f"/api/v1/orders/{order_id}")
         self.assertEqual(other_detail_response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_order_fails_if_quantity_exceeds_available(self):
@@ -105,7 +105,7 @@ class OrdersApiTests(APITestCase):
         
         # Attempt to place order for 120 (available is 100)
         create_response = self.client.post(
-            "/api/v1/orders/",
+            "/api/v1/orders",
             {
                 "listing_id": self.listing.public_id,
                 "quantity": "120.00",

@@ -109,6 +109,7 @@ CORS_ALLOWED_HEADERS = (
 )
 
 ROOT_URLCONF = "config.urls"
+APPEND_SLASH = False
 
 TEMPLATES = [
     {

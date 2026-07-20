@@ -29,7 +29,7 @@ def root_view(_request):
             "status": "online",
             "documentation": "/docs/",
             "openapi": "/openapi.json",
-            "api": "/api/v1/",
+            "api": "/api/v1",
             "timestamp": timezone.now().isoformat(),
         }
     )
@@ -38,11 +38,11 @@ def root_view(_request):
 urlpatterns = [
     path("", root_view, name="root"),
     path('admin/', admin.site.urls),
-    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
-    path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
-    path("api/v1/auth/", include("apps.auth.urls")),
-    path("api/v1/users/", include("apps.users.urls")),
-    path("api/v1/commodities/", include("apps.commodities.urls")),
+    path("api/schema", SpectacularAPIView.as_view(), name="schema"),
+    path("api/docs", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
+    path("api/v1/", include("apps.auth.urls")),
+    path("api/v1/", include("apps.users.urls")),
+    path("api/v1/", include("apps.commodities.urls")),
     path("api/v1/", include("apps.areas.urls")),
     path("api/v1/", include("apps.listings.urls")),
     path("api/v1/", include("apps.orders.urls")),

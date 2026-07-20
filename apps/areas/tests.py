@@ -37,7 +37,7 @@ class AreasApiTests(APITestCase):
         self.client.force_authenticate(self.admin)
 
         create_response = self.client.post(
-            "/api/v1/areas/",
+            "/api/v1/areas",
             {
                 "name": "Dar es Salaam",
                 "level": "region",
@@ -49,7 +49,7 @@ class AreasApiTests(APITestCase):
         parent_id = create_response.data["data"]["area_id"]
 
         child_response = self.client.post(
-            "/api/v1/areas/",
+            "/api/v1/areas",
             {
                 "name": "Kinondoni",
                 "level": "district",
@@ -60,14 +60,14 @@ class AreasApiTests(APITestCase):
         self.assertEqual(child_response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(child_response.data["data"]["parent"]["name"], "Dar es Salaam")
 
-        list_response = self.client.get("/api/v1/areas/")
+        list_response = self.client.get("/api/v1/areas")
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)
         self.assertGreaterEqual(len(list_response.data["data"]), 2)
 
     def test_farmer_cannot_create_adm_areas(self):
         self.client.force_authenticate(self.farmer)
         create_response = self.client.post(
-            "/api/v1/areas/",
+            "/api/v1/areas",
             {
                 "name": "Tanga",
                 "level": "region",
@@ -158,7 +158,7 @@ class AreasApiTests(APITestCase):
         district = AdmArea.objects.create(name="Kilombero", level="district", parent=region)
 
         missing_parent_response = self.client.post(
-            "/api/v1/areas/",
+            "/api/v1/areas",
             {"name": "Ifakara", "level": "district"},
             format="json",
         )
@@ -166,7 +166,7 @@ class AreasApiTests(APITestCase):
         self.assertIn("parent_id", missing_parent_response.data["errors"])
 
         wrong_parent_response = self.client.post(
-            "/api/v1/areas/",
+            "/api/v1/areas",
             {"name": "Bad Ward", "level": "ward", "parent_id": region.public_id},
             format="json",
         )
@@ -174,7 +174,7 @@ class AreasApiTests(APITestCase):
         self.assertIn("parent_id", wrong_parent_response.data["errors"])
 
         ward_response = self.client.post(
-            "/api/v1/areas/",
+            "/api/v1/areas",
             {"name": "Ifakara", "level": "ward", "parent_id": district.public_id},
             format="json",
         )
@@ -186,7 +186,7 @@ class AreasApiTests(APITestCase):
         region = AdmArea.objects.create(name="Morogoro", level="region")
 
         response = self.client.post(
-            "/api/v1/areas/",
+            "/api/v1/areas",
             {"name": "Nested Region", "level": "region", "parent_id": region.public_id},
             format="json",
         )
@@ -197,7 +197,7 @@ class AreasApiTests(APITestCase):
     def test_unauthenticated_can_list_adm_areas(self):
         AdmArea.objects.create(name="Public Region", level="region")
         self.client.force_authenticate(user=None)
-        list_response = self.client.get("/api/v1/areas/")
+        list_response = self.client.get("/api/v1/areas")
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)
         self.assertTrue(list_response.data["success"])
 
@@ -206,7 +206,7 @@ class AreasApiTests(APITestCase):
             AdmArea.objects.create(name=f"Region {index:02d}", level="region")
 
         self.client.force_authenticate(user=None)
-        response = self.client.get("/api/v1/areas/", {"page": 2, "page_size": 5})
+        response = self.client.get("/api/v1/areas", {"page": 2, "page_size": 5})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["data"]), 5)
@@ -226,7 +226,7 @@ class AreasApiTests(APITestCase):
         AdmArea.objects.create(name="Arusha", level="region")
 
         self.client.force_authenticate(user=None)
-        response = self.client.get("/api/v1/areas/", {"level": "ward", "page": 1, "page_size": 1})
+        response = self.client.get("/api/v1/areas", {"level": "ward", "page": 1, "page_size": 1})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["meta"]["pagination"]["total_items"], 1)
@@ -241,16 +241,16 @@ class AreasApiTests(APITestCase):
 
         self.client.force_authenticate(user=None)
 
-        level_response = self.client.get("/api/v1/areas/", {"level": "region"})
+        level_response = self.client.get("/api/v1/areas", {"level": "region"})
         self.assertEqual(level_response.status_code, status.HTTP_200_OK)
         self.assertTrue(any(x["name"] == "Arusha" for x in level_response.data["data"]))
 
-        search_response = self.client.get("/api/v1/areas/", {"search": "eru"})
+        search_response = self.client.get("/api/v1/areas", {"search": "eru"})
         self.assertEqual(search_response.status_code, status.HTTP_200_OK)
         self.assertTrue(any(x["name"] == "Meru" for x in search_response.data["data"]))
         self.assertFalse(any(x["name"] == "Arusha" for x in search_response.data["data"]))
 
-        parent_response = self.client.get("/api/v1/areas/", {"parent_id": parent_region.public_id})
+        parent_response = self.client.get("/api/v1/areas", {"parent_id": parent_region.public_id})
         self.assertEqual(parent_response.status_code, status.HTTP_200_OK)
         self.assertTrue(any(x["name"] == "Meru" for x in parent_response.data["data"]))
         self.assertFalse(any(x["name"] == "Arusha" for x in parent_response.data["data"]))

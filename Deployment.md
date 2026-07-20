@@ -258,19 +258,19 @@ python manage.py check
 Check API docs:
 
 ```bash
-curl -I https://kolinki.databenki.co.tz/api/docs/
+curl -I https://kolinki.databenki.co.tz/api/docs
 ```
 
 Check API schema:
 
 ```bash
-curl -I https://kolinki.databenki.co.tz/api/schema/
+curl -I https://kolinki.databenki.co.tz/api/schema
 ```
 
 Check the local Gunicorn backend through localhost:
 
 ```bash
-curl -I http://127.0.0.1:8000/api/docs/
+curl -I http://127.0.0.1:8000/api/docs
 ```
 
 ## 11. Common Errors And Fixes

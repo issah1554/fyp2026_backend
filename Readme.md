@@ -40,19 +40,19 @@ Or without activating the virtualenv:
 API base URL:
 
 ```text
-http://127.0.0.1:8000/api/v1/
+http://127.0.0.1:8000/api/v1
 ```
 
 Swagger docs:
 
 ```text
-http://127.0.0.1:8000/api/docs/
+http://127.0.0.1:8000/api/docs
 ```
 
 OpenAPI schema:
 
 ```text
-http://127.0.0.1:8000/api/schema/
+http://127.0.0.1:8000/api/schema
 ```
 
 ## Migrations
@@ -289,13 +289,13 @@ python manage.py shell -c "from django.urls import reverse; print(reverse('auth:
 ## Auth Endpoints
 
 ```text
-POST /api/v1/auth/register/
-POST /api/v1/auth/login/
-POST /api/v1/auth/token/refresh/
-POST /api/v1/auth/email/verify/
-POST /api/v1/auth/email/resend/
-GET  /api/v1/auth/me/
-POST /api/v1/auth/logout/
+POST /api/v1/auth/register
+POST /api/v1/auth/login
+POST /api/v1/auth/token/refresh
+POST /api/v1/auth/email/verify
+POST /api/v1/auth/email/resend
+GET  /api/v1/auth/me
+POST /api/v1/auth/logout
 ```
 
 ## Git

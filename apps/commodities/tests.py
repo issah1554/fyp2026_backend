@@ -25,7 +25,7 @@ class CommodityApiTests(APITestCase):
 
     def test_admin_can_create_category_and_commodity(self):
         category_response = self.client.post(
-            "/api/v1/commodities/categories/",
+            "/api/v1/commodities/categories",
             {"name": "Cereals", "description": "Grain crops"},
             format="json",
         )
@@ -37,7 +37,7 @@ class CommodityApiTests(APITestCase):
         self.assertNotIn("id", category_response.data["data"])
 
         commodity_response = self.client.post(
-            "/api/v1/commodities/",
+            "/api/v1/commodities",
             {
                 "name": "Maize",
                 "unit": "kg",
@@ -56,7 +56,7 @@ class CommodityApiTests(APITestCase):
 
     def test_admin_can_manage_units_and_assign_unit_to_commodity(self):
         unit_response = self.client.post(
-            "/api/v1/commodities/units/",
+            "/api/v1/commodities/units",
             {"name": "Kilogram", "symbol": "Kg", "description": "Weight in kilograms"},
             format="json",
         )
@@ -65,7 +65,7 @@ class CommodityApiTests(APITestCase):
         self.assertRegex(unit_id, r"^[1-9BCDFGHJKLMNPQRSTVWXYZbcdfghjkmnpqrstvwxyz]{10}$")
 
         commodity_response = self.client.post(
-            "/api/v1/commodities/",
+            "/api/v1/commodities",
             {
                 "name": "Rice",
                 "unit_id": unit_id,
@@ -78,14 +78,14 @@ class CommodityApiTests(APITestCase):
         self.assertEqual(commodity_response.data["data"]["unit_detail"]["unit_id"], unit_id)
 
         update_response = self.client.patch(
-            f"/api/v1/commodities/units/{unit_id}/",
+            f"/api/v1/commodities/units/{unit_id}",
             {"symbol": "kg"},
             format="json",
         )
         self.assertEqual(update_response.status_code, status.HTTP_200_OK)
         self.assertEqual(update_response.data["data"]["symbol"], "kg")
 
-        list_response = self.client.get("/api/v1/commodities/units/")
+        list_response = self.client.get("/api/v1/commodities/units")
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)
         self.assertTrue(any(x["unit_id"] == unit_id for x in list_response.data["data"]))
 
@@ -101,12 +101,12 @@ class CommodityApiTests(APITestCase):
         commodity.categories.add(category)
         self.client.force_authenticate(user)
 
-        list_response = self.client.get("/api/v1/commodities/")
+        list_response = self.client.get("/api/v1/commodities")
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)
         self.assertTrue(list_response.data["success"])
         self.assertEqual(list_response.data["data"][0]["commodity_id"], commodity.public_id)
 
-        detail_response = self.client.get(f"/api/v1/commodities/{commodity.public_id}/")
+        detail_response = self.client.get(f"/api/v1/commodities/{commodity.public_id}")
         self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
         self.assertEqual(detail_response.data["data"]["name"], "Tomato")
 
@@ -120,7 +120,7 @@ class CommodityApiTests(APITestCase):
         self.client.force_authenticate(user)
 
         response = self.client.post(
-            "/api/v1/commodities/",
+            "/api/v1/commodities",
             {"name": "Rice", "unit": "kg"},
             format="json",
         )
@@ -134,7 +134,7 @@ class CommodityApiTests(APITestCase):
         commodity.categories.add(category)
 
         update_response = self.client.patch(
-            f"/api/v1/commodities/{commodity.public_id}/",
+            f"/api/v1/commodities/{commodity.public_id}",
             {"unit": "basket", "category_ids": []},
             format="json",
         )
@@ -142,7 +142,7 @@ class CommodityApiTests(APITestCase):
         self.assertEqual(update_response.data["data"]["unit"], "basket")
         self.assertEqual(update_response.data["data"]["categories"], [])
 
-        delete_response = self.client.delete(f"/api/v1/commodities/{commodity.public_id}/")
+        delete_response = self.client.delete(f"/api/v1/commodities/{commodity.public_id}")
         self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
         self.assertFalse(Commodity.objects.filter(public_id=commodity.public_id).exists())
 
@@ -153,7 +153,7 @@ class CommodityApiTests(APITestCase):
             if index < 8:
                 commodity.categories.add(category)
 
-        response = self.client.get("/api/v1/commodities/", {"page": 2, "page_size": 5})
+        response = self.client.get("/api/v1/commodities", {"page": 2, "page_size": 5})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["data"]), 5)
@@ -174,12 +174,12 @@ class CommodityApiTests(APITestCase):
         tomato = Commodity.objects.create(name="Tomato", unit="crate")
         tomato.categories.add(vegetables)
 
-        category_response = self.client.get("/api/v1/commodities/", {"category_id": cereals.public_id})
+        category_response = self.client.get("/api/v1/commodities", {"category_id": cereals.public_id})
         self.assertEqual(category_response.status_code, status.HTTP_200_OK)
         self.assertTrue(any(x["name"] == "Maize" for x in category_response.data["data"]))
         self.assertFalse(any(x["name"] == "Tomato" for x in category_response.data["data"]))
 
-        search_response = self.client.get("/api/v1/commodities/", {"search": "tom"})
+        search_response = self.client.get("/api/v1/commodities", {"search": "tom"})
         self.assertEqual(search_response.status_code, status.HTTP_200_OK)
         self.assertTrue(any(x["name"] == "Tomato" for x in search_response.data["data"]))
         self.assertFalse(any(x["name"] == "Maize" for x in search_response.data["data"]))

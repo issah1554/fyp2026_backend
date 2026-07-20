@@ -183,25 +183,25 @@ External Data Sources
 
 ## API Documentation
 
-The first API module is authentication, exposed under `/api/v1/auth/`.
+The first API module is authentication, exposed under `/api/v1/auth`.
 
 ### Auth Endpoints
 
 | Method | Endpoint | Description | Auth |
 | --- | --- | --- | --- |
-| `POST` | `/api/v1/auth/register/` | Register a user and profile role | Public |
-| `POST` | `/api/v1/auth/login/` | Login with username and password | Public |
-| `POST` | `/api/v1/auth/token/refresh/` | Refresh an access token | Public |
-| `POST` | `/api/v1/auth/email/verify/` | Verify a user's email verification token | Public |
-| `POST` | `/api/v1/auth/email/resend/` | Resend email verification token | Public |
-| `GET` | `/api/v1/auth/me/` | Get the authenticated user profile | Bearer token |
-| `POST` | `/api/v1/auth/logout/` | Logout acknowledgement; client discards tokens | Bearer token |
+| `POST` | `/api/v1/auth/register` | Register a user and profile role | Public |
+| `POST` | `/api/v1/auth/login` | Login with username and password | Public |
+| `POST` | `/api/v1/auth/token/refresh` | Refresh an access token | Public |
+| `POST` | `/api/v1/auth/email/verify` | Verify a user's email verification token | Public |
+| `POST` | `/api/v1/auth/email/resend` | Resend email verification token | Public |
+| `GET` | `/api/v1/auth/me` | Get the authenticated user profile | Bearer token |
+| `POST` | `/api/v1/auth/logout` | Logout acknowledgement; client discards tokens | Bearer token |
 
 OpenAPI contract: `docs/openapi/openapi.yaml`
 
-Served OpenAPI schema: `/api/schema/`
+Served OpenAPI schema: `/api/schema`
 
-Swagger UI: `/api/docs/`
+Swagger UI: `/api/docs`
 
 Bruno collection: `docs/bruno`
 
