@@ -23,7 +23,6 @@ class AuthApiTests(APITestCase):
                 "last_name": "Juma",
                 "role": "farmer",
                 "phone_number": "+255700000001",
-                "organization": "Ifakara Farmers Group",
             },
             HTTP_ORIGIN="http://localhost:3000",
             format="json",
@@ -39,6 +38,7 @@ class AuthApiTests(APITestCase):
         self.assertRegex(response.data["data"]["user_id"], r"^[1-9BCDFGHJKLMNPQRSTVWXYZbcdfghjkmnpqrstvwxyz]{10}$")
         self.assertNotIn("id", response.data["data"])
         self.assertEqual(response.data["data"]["profile"]["role"], "farmer")
+        self.assertEqual(response.data["data"]["profile"]["organization"], "")
         self.assertFalse(response.data["data"]["profile"]["is_email_verified"])
         self.assertNotIn("password", response.data["data"])
         self.assertIn("meta", response.data)

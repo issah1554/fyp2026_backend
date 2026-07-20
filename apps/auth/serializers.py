@@ -52,7 +52,6 @@ class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
     role = serializers.SlugRelatedField(slug_field="code", queryset=Role.objects.all(), default=default_profile_role)
     phone_number = serializers.CharField(required=False, allow_blank=True)
-    organization = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = User
@@ -64,7 +63,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             "last_name",
             "role",
             "phone_number",
-            "organization",
         ]
 
     def validate_email(self, value):
@@ -84,7 +82,6 @@ class RegisterSerializer(serializers.ModelSerializer):
         profile_data = {
             "role": validated_data.pop("role", Profile.Role.FARMER),
             "phone_number": validated_data.pop("phone_number", ""),
-            "organization": validated_data.pop("organization", ""),
         }
         password = validated_data.pop("password")
         user = User(**validated_data)
