@@ -15,10 +15,28 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+from django.http import JsonResponse
 from django.urls import include, path
+from django.utils import timezone
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+
+def root_view(_request):
+    return JsonResponse(
+        {
+            "name": "SmartMarket API",
+            "version": "1.0.0",
+            "status": "online",
+            "documentation": "/docs/",
+            "openapi": "/openapi.json",
+            "api": "/api/v1/",
+            "timestamp": timezone.now().isoformat(),
+        }
+    )
+
+
 urlpatterns = [
+    path("", root_view, name="root"),
     path('admin/', admin.site.urls),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
