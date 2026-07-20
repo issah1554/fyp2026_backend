@@ -14,8 +14,9 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from django.conf import settings
 from django.contrib import admin
-from django.http import JsonResponse
+from django.http import FileResponse, JsonResponse
 from django.urls import include, path
 from django.utils import timezone
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
@@ -35,8 +36,16 @@ def root_view(_request):
     )
 
 
+def favicon_view(_request):
+    return FileResponse(
+        open(settings.BASE_DIR / "static" / "favicon.png", "rb"),
+        content_type="image/png",
+    )
+
+
 urlpatterns = [
     path("", root_view, name="root"),
+    path("favicon.ico", favicon_view, name="favicon"),
     path('admin/', admin.site.urls),
     path("api/schema", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
