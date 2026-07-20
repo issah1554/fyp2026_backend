@@ -44,12 +44,12 @@ class AdmAreaSerializer(serializers.ModelSerializer):
         name = attrs.get("name", getattr(self.instance, "name", None))
         parent = attrs.get("parent_id", getattr(self.instance, "parent", None))
         expected_parent_level = AREA_PARENT_LEVELS.get(level)
-        duplicate = AdmArea.objects.filter(level=level, name=name)
+        duplicate = AdmArea.objects.filter(parent=parent, level=level, name=name)
         if self.instance is not None:
             duplicate = duplicate.exclude(pk=self.instance.pk)
         if name and duplicate.exists():
             raise serializers.ValidationError(
-                {"name": "An administrative area with this level and name already exists."}
+                {"name": "An administrative area with this parent, level, and name already exists."}
             )
 
         if expected_parent_level is None:

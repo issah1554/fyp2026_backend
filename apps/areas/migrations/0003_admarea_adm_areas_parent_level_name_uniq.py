@@ -12,6 +12,6 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddConstraint(
             model_name='admarea',
-            constraint=models.UniqueConstraint(fields=('level', 'name'), name='adm_areas_level_name_uniq'),
+            constraint=models.UniqueConstraint(fields=('parent', 'level', 'name'), name='adm_areas_parent_level_name_uniq'),
         ),
     ]

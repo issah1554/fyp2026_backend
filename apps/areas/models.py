@@ -32,7 +32,7 @@ class AdmArea(models.Model):
             models.Index(fields=["parent", "level", "name"], name="adm_areas_path_idx"),
         ]
         constraints = [
-            models.UniqueConstraint(fields=["level", "name"], name="adm_areas_level_name_uniq"),
+            models.UniqueConstraint(fields=["parent", "level", "name"], name="adm_areas_parent_level_name_uniq"),
         ]
 
     def save(self, *args, **kwargs):

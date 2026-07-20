@@ -76,7 +76,7 @@ class AreasApiTests(APITestCase):
         )
         self.assertEqual(create_response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_adm_area_level_and_name_must_be_unique(self):
+    def test_adm_area_parent_level_and_name_must_be_unique(self):
         self.client.force_authenticate(self.admin)
         region = AdmArea.objects.create(name="Morogoro", level="region")
         other_region = AdmArea.objects.create(name="Arusha", level="region")
@@ -91,8 +91,19 @@ class AreasApiTests(APITestCase):
             },
             format="json",
         )
-        self.assertEqual(duplicate_create_response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("name", duplicate_create_response.data["errors"])
+        self.assertEqual(duplicate_create_response.status_code, status.HTTP_201_CREATED)
+
+        duplicate_sibling_response = self.client.post(
+            "/api/v1/areas",
+            {
+                "name": "Kilombero",
+                "level": "district",
+                "parent_id": region.public_id,
+            },
+            format="json",
+        )
+        self.assertEqual(duplicate_sibling_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("name", duplicate_sibling_response.data["errors"])
 
     def test_admin_can_bulk_create_adm_areas_without_trailing_slash(self):
         self.client.force_authenticate(self.admin)
