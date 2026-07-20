@@ -105,6 +105,43 @@ class AreasApiTests(APITestCase):
         self.assertEqual(duplicate_sibling_response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("name", duplicate_sibling_response.data["errors"])
 
+    def test_adm_area_parent_level_and_name_uniqueness_is_case_insensitive(self):
+        self.client.force_authenticate(self.admin)
+        region = AdmArea.objects.create(name="Mbeya", level="region")
+        other_region = AdmArea.objects.create(name="Iringa", level="region")
+        AdmArea.objects.create(name="Mbarali", level="district", parent=region)
+
+        duplicate_region_response = self.client.post(
+            "/api/v1/areas",
+            {"name": "mbeya", "level": "region"},
+            format="json",
+        )
+        self.assertEqual(duplicate_region_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("name", duplicate_region_response.data["errors"])
+
+        duplicate_sibling_response = self.client.post(
+            "/api/v1/areas",
+            {
+                "name": "mbarali",
+                "level": "district",
+                "parent_id": region.public_id,
+            },
+            format="json",
+        )
+        self.assertEqual(duplicate_sibling_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("name", duplicate_sibling_response.data["errors"])
+
+        different_parent_response = self.client.post(
+            "/api/v1/areas",
+            {
+                "name": "mbarali",
+                "level": "district",
+                "parent_id": other_region.public_id,
+            },
+            format="json",
+        )
+        self.assertEqual(different_parent_response.status_code, status.HTTP_201_CREATED)
+
     def test_admin_can_bulk_create_adm_areas_without_trailing_slash(self):
         self.client.force_authenticate(self.admin)
 

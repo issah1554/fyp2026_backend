@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models.functions import Lower
 
 from apps.common.ids import generate_unique_public_id
 
@@ -32,7 +33,12 @@ class AdmArea(models.Model):
             models.Index(fields=["parent", "level", "name"], name="adm_areas_path_idx"),
         ]
         constraints = [
-            models.UniqueConstraint(fields=["parent", "level", "name"], name="adm_areas_parent_level_name_uniq"),
+            models.UniqueConstraint(
+                "parent",
+                "level",
+                Lower("name"),
+                name="adm_areas_parent_level_lower_name_uniq",
+            ),
         ]
 
     def save(self, *args, **kwargs):
