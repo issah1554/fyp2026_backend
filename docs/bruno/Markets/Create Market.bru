@@ -1,0 +1,46 @@
+meta {
+  name: Create Market
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/v1/markets
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "{{market_name}}",
+    "code": "{{market_code}}",
+    "admin_area_id": "{{admin_area_id}}",
+    "address": "{{market_address}}",
+    "latitude": 0.3475964,
+    "longitude": 32.5825197,
+    "description": "{{market_description}}",
+    "status": "active"
+  }
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("access_token");
+  if (!token) {
+    throw new Error("Missing access_token. Run Auth > Login first.");
+  }
+  
+  req.setHeader("Authorization", `Bearer ${token}`);
+}
+
+script:post-response {
+  if (!res.body?.data?.market_id) {
+    bru.setEnvVar("market_id", "");
+    return;
+  }
+  
+  bru.setEnvVar("market_id", res.body.data.market_id);
+}

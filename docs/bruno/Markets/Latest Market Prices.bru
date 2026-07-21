@@ -1,0 +1,20 @@
+meta {
+  name: Latest Market Prices
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{base_url}}/api/v1/markets/{{market_id}}/latest-prices
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("access_token");
+  if (!token) {
+    throw new Error("Missing access_token. Run Auth > Login first.");
+  }
+  
+  req.setHeader("Authorization", `Bearer ${token}`);
+}

@@ -1,0 +1,26 @@
+meta {
+  name: Commodity Price History
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{base_url}}/api/v1/commodities/{{commodity_id}}/price-history
+  body: none
+  auth: none
+}
+
+params:query {
+  page: 1
+  page_size: 10
+  market_id: 
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("access_token");
+  if (!token) {
+    throw new Error("Missing access_token. Run Auth > Login first.");
+  }
+  
+  req.setHeader("Authorization", `Bearer ${token}`);
+}

@@ -1,0 +1,20 @@
+meta {
+  name: Delete Market
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{base_url}}/api/v1/markets/{{market_id}}
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("access_token");
+  if (!token) {
+    throw new Error("Missing access_token. Run Auth > Login first.");
+  }
+  
+  req.setHeader("Authorization", `Bearer ${token}`);
+}

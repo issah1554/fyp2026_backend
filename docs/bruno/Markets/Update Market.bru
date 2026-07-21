@@ -1,0 +1,33 @@
+meta {
+  name: Update Market
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{base_url}}/api/v1/markets/{{market_id}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "{{market_name}}",
+    "address": "{{market_address}}",
+    "description": "{{market_description}}",
+    "status": "active"
+  }
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("access_token");
+  if (!token) {
+    throw new Error("Missing access_token. Run Auth > Login first.");
+  }
+  
+  req.setHeader("Authorization", `Bearer ${token}`);
+}

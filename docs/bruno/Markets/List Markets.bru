@@ -1,0 +1,28 @@
+meta {
+  name: List Markets
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/api/v1/markets
+  body: none
+  auth: none
+}
+
+params:query {
+  page: 1
+  page_size: 10
+  search: 
+  status: 
+  admin_area_id: 
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("access_token");
+  if (!token) {
+    throw new Error("Missing access_token. Run Auth > Login first.");
+  }
+  
+  req.setHeader("Authorization", `Bearer ${token}`);
+}

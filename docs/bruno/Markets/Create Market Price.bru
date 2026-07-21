@@ -1,0 +1,42 @@
+meta {
+  name: Create Market Price
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{base_url}}/api/v1/markets/{{market_id}}/prices
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "commodity_id": "{{commodity_id}}",
+    "price": {{market_price}},
+    "currency": "{{market_price_currency}}",
+    "price_date": "{{market_price_date}}"
+  }
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("access_token");
+  if (!token) {
+    throw new Error("Missing access_token. Run Auth > Login first.");
+  }
+  
+  req.setHeader("Authorization", `Bearer ${token}`);
+}
+
+script:post-response {
+  if (!res.body?.data?.price_id) {
+    bru.setEnvVar("price_id", "");
+    return;
+  }
+  
+  bru.setEnvVar("price_id", res.body.data.price_id);
+}

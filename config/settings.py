@@ -71,6 +71,7 @@ INSTALLED_APPS = [
     "apps.auth.apps.AuthConfig",
     "apps.users.apps.UsersConfig",
     "apps.commodities.apps.CommoditiesConfig",
+    "apps.markets.apps.MarketsConfig",
     "apps.areas.apps.AreasConfig",
     "apps.listings.apps.ListingsConfig",
     "apps.orders.apps.OrdersConfig",

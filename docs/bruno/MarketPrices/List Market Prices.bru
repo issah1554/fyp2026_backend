@@ -1,0 +1,30 @@
+meta {
+  name: List Market Prices
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/api/v1/market-prices
+  body: none
+  auth: none
+}
+
+params:query {
+  page: 1
+  page_size: 10
+  market_id: 
+  commodity_id: 
+  price_date: 
+  date_from: 
+  date_to: 
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("access_token");
+  if (!token) {
+    throw new Error("Missing access_token. Run Auth > Login first.");
+  }
+  
+  req.setHeader("Authorization", `Bearer ${token}`);
+}
