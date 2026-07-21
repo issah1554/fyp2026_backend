@@ -45,6 +45,11 @@ class CommodityCategoryMixin:
 
 @extend_schema(tags=["Commodity Categories"])
 class CommodityCategoryListCreateView(CommodityCategoryMixin, APIView):
+    permission_codes = {
+        "GET": "commodities.categories.list",
+        "POST": "commodities.categories.create",
+    }
+
     @extend_schema(responses={200: CommodityCategorySerializer(many=True)})
     def get(self, request):
         categories = self.get_queryset()
@@ -64,6 +69,12 @@ class CommodityCategoryListCreateView(CommodityCategoryMixin, APIView):
 
 @extend_schema(tags=["Commodity Categories"])
 class CommodityCategoryDetailView(CommodityCategoryMixin, APIView):
+    permission_codes = {
+        "GET": "commodities.categories.read",
+        "PATCH": "commodities.categories.update",
+        "DELETE": "commodities.categories.delete",
+    }
+
     @extend_schema(responses={200: CommodityCategorySerializer, 404: OpenApiResponse(description="Category not found.")})
     def get(self, request, category_id):
         category = self.get_category(category_id)
@@ -100,6 +111,11 @@ class CommodityUnitMixin:
 
 @extend_schema(tags=["Commodity Units"])
 class CommodityUnitListCreateView(CommodityUnitMixin, APIView):
+    permission_codes = {
+        "GET": "commodities.units.list",
+        "POST": "commodities.units.create",
+    }
+
     @extend_schema(responses={200: CommodityUnitSerializer(many=True)})
     def get(self, request):
         units = self.get_queryset()
@@ -119,6 +135,12 @@ class CommodityUnitListCreateView(CommodityUnitMixin, APIView):
 
 @extend_schema(tags=["Commodity Units"])
 class CommodityUnitDetailView(CommodityUnitMixin, APIView):
+    permission_codes = {
+        "GET": "commodities.units.read",
+        "PATCH": "commodities.units.update",
+        "DELETE": "commodities.units.delete",
+    }
+
     @extend_schema(responses={200: CommodityUnitSerializer, 404: OpenApiResponse(description="Unit not found.")})
     def get(self, request, unit_id):
         unit = self.get_unit(unit_id)
@@ -155,6 +177,11 @@ class CommodityMixin:
 
 @extend_schema(tags=["Commodities"])
 class CommodityListCreateView(CommodityMixin, APIView):
+    permission_codes = {
+        "GET": "commodities.list",
+        "POST": "commodities.create",
+    }
+
     @extend_schema(responses={200: CommoditySerializer(many=True)})
     def get(self, request):
         queryset = self.get_queryset()
@@ -210,6 +237,12 @@ class CommodityListCreateView(CommodityMixin, APIView):
 
 @extend_schema(tags=["Commodities"])
 class CommodityDetailView(CommodityMixin, APIView):
+    permission_codes = {
+        "GET": "commodities.read",
+        "PATCH": "commodities.update",
+        "DELETE": "commodities.delete",
+    }
+
     @extend_schema(responses={200: CommoditySerializer, 404: OpenApiResponse(description="Commodity not found.")})
     def get(self, request, commodity_id):
         commodity = self.get_commodity(commodity_id)

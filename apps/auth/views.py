@@ -5,6 +5,7 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from apps.common.responses import mutation_payload, mutation_response, success_response
+from apps.common.permissions import HasPermissionCode
 
 from .serializers import (
     AccountDeletionSerializer,
@@ -164,7 +165,11 @@ class PasswordResetConfirmView(APIView):
     tags=["Auth"],
 )
 class MeView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [HasPermissionCode]
+    permission_codes = {
+        "GET": "auth.me",
+        "DELETE": "auth.account.delete",
+    }
 
     @extend_schema(responses={200: UserSerializer})
     def get(self, request):
@@ -192,7 +197,10 @@ class MeView(APIView):
     },
 )
 class LogoutView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [HasPermissionCode]
+    permission_codes = {
+        "POST": "auth.logout",
+    }
 
     def post(self, request):
         return mutation_response(

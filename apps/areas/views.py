@@ -128,6 +128,11 @@ class AdmAreaMixin:
 
 @extend_schema(tags=["Administrative Areas"])
 class AdmAreaListCreateView(AdmAreaMixin, APIView):
+    permission_codes = {
+        "GET": "areas.list",
+        "POST": "areas.create",
+    }
+
     @extend_schema(responses={200: AdmAreaSerializer(many=True)})
     def get(self, request):
         queryset = self.get_queryset()
@@ -188,6 +193,10 @@ class AdmAreaListCreateView(AdmAreaMixin, APIView):
 
 @extend_schema(tags=["Administrative Areas"])
 class AdmAreaBulkCreateView(AdmAreaMixin, APIView):
+    permission_codes = {
+        "POST": "areas.bulk_import",
+    }
+
     @extend_schema(request=AdmAreaPathImportSerializer(many=True), responses={200: OpenApiResponse(description="Bulk import result.")})
     def post(self, request):
         serializer = AdmAreaPathImportSerializer(data=request.data, many=True)
@@ -247,6 +256,12 @@ class AdmAreaBulkCreateView(AdmAreaMixin, APIView):
 
 @extend_schema(tags=["Administrative Areas"])
 class AdmAreaDetailView(AdmAreaMixin, APIView):
+    permission_codes = {
+        "GET": "areas.read",
+        "PATCH": "areas.update",
+        "DELETE": "areas.delete",
+    }
+
     @extend_schema(responses={200: AdmAreaSerializer, 404: OpenApiResponse(description="Area not found.")})
     def get(self, request, area_id):
         area = self.get_area(area_id)

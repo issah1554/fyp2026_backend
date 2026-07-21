@@ -260,9 +260,9 @@ class AreasApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("parent_id", response.data["errors"])
 
-    def test_unauthenticated_can_list_adm_areas(self):
+    def test_permitted_user_can_list_adm_areas(self):
         AdmArea.objects.create(name="Public Region", level="region")
-        self.client.force_authenticate(user=None)
+        self.client.force_authenticate(self.farmer)
         list_response = self.client.get("/api/v1/areas")
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)
         self.assertTrue(list_response.data["success"])
@@ -271,7 +271,7 @@ class AreasApiTests(APITestCase):
         for index in range(12):
             AdmArea.objects.create(name=f"Region {index:02d}", level="region")
 
-        self.client.force_authenticate(user=None)
+        self.client.force_authenticate(self.farmer)
         response = self.client.get("/api/v1/areas", {"page": 2, "page_size": 5})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -291,7 +291,7 @@ class AreasApiTests(APITestCase):
         AdmArea.objects.create(name="Ifakara", level="ward", parent=district)
         AdmArea.objects.create(name="Arusha", level="region")
 
-        self.client.force_authenticate(user=None)
+        self.client.force_authenticate(self.farmer)
         response = self.client.get("/api/v1/areas", {"level": "ward", "page": 1, "page_size": 1})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -305,7 +305,7 @@ class AreasApiTests(APITestCase):
         parent_region = AdmArea.objects.create(name="Arusha", level="region")
         AdmArea.objects.create(name="Meru", level="district", parent=parent_region)
 
-        self.client.force_authenticate(user=None)
+        self.client.force_authenticate(self.farmer)
 
         level_response = self.client.get("/api/v1/areas", {"level": "region"})
         self.assertEqual(level_response.status_code, status.HTTP_200_OK)

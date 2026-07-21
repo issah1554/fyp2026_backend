@@ -1,45 +1,25 @@
-from rest_framework.permissions import SAFE_METHODS, BasePermission
+from rest_framework.permissions import SAFE_METHODS
 
 from apps.auth.models import Profile
+from apps.common.permissions import HasPermissionCode, user_has_permission_code
 
 
-class IsSellerOrReadOnly(BasePermission):
+class IsSellerOrReadOnly(HasPermissionCode):
     message = "You do not have permission to perform this action on this listing."
 
     def has_permission(self, request, view):
-        # Safe methods (GET, HEAD, OPTIONS) are allowed for all users
-        if request.method in SAFE_METHODS:
-            return True
-            
-        user = request.user
-        if not user or not user.is_authenticated:
-            return False
-            
-        # Admin / Staff can do anything
-        if user.is_staff or user.is_superuser:
-            return True
-        try:
-            if user.profile.role.code == Profile.Role.ADMIN:
-                return True
-            # Create action: Only farmers and entrepreneurs (and admin)
-            if request.method == "POST":
-                return user.profile.role.code in [Profile.Role.FARMER, Profile.Role.ENTREPRENEUR]
-        except Profile.DoesNotExist:
-            return False
-            
-        return True
+        return super().has_permission(request, view)
 
     def has_object_permission(self, request, view, obj):
         user = request.user
-        if request.method in SAFE_METHODS:
-            return True
-        if user.is_staff or user.is_superuser:
+        permission_code = getattr(view, "permission_codes", {}).get(request.method)
+        if not user_has_permission_code(user, permission_code):
+            return False
+        if request.method in SAFE_METHODS or user.is_staff or user.is_superuser:
             return True
         try:
             if user.profile.role.code == Profile.Role.ADMIN:
                 return True
         except Profile.DoesNotExist:
             pass
-            
-        # For update/delete, must be the owner (seller) of the listing
         return obj.user == user

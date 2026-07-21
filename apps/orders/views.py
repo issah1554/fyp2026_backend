@@ -46,6 +46,11 @@ class OrderMixin:
 
 @extend_schema(tags=["Orders"])
 class OrderListCreateView(OrderMixin, APIView):
+    permission_codes = {
+        "GET": "orders.list",
+        "POST": "orders.create",
+    }
+
     @extend_schema(responses={200: OrderSerializer(many=True)})
     def get(self, request):
         orders = self.get_queryset()
@@ -65,6 +70,11 @@ class OrderListCreateView(OrderMixin, APIView):
 
 @extend_schema(tags=["Orders"])
 class OrderDetailView(OrderMixin, APIView):
+    permission_codes = {
+        "GET": "orders.read",
+        "PATCH": "orders.update",
+    }
+
     @extend_schema(responses={200: OrderSerializer, 404: OpenApiResponse(description="Order not found.")})
     def get(self, request, order_id):
         order = self.get_order(order_id)

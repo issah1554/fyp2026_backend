@@ -23,6 +23,11 @@ class CommodityListingMixin:
 
 @extend_schema(tags=["Commodity Listings"])
 class CommodityListingListCreateView(CommodityListingMixin, APIView):
+    permission_codes = {
+        "GET": "listings.list",
+        "POST": "listings.create",
+    }
+
     @extend_schema(responses={200: CommodityListingSerializer(many=True)})
     def get(self, request):
         queryset = self.get_queryset()
@@ -57,6 +62,12 @@ class CommodityListingListCreateView(CommodityListingMixin, APIView):
 
 @extend_schema(tags=["Commodity Listings"])
 class CommodityListingDetailView(CommodityListingMixin, APIView):
+    permission_codes = {
+        "GET": "listings.read",
+        "PATCH": "listings.update",
+        "DELETE": "listings.delete",
+    }
+
     @extend_schema(responses={200: CommodityListingSerializer, 404: OpenApiResponse(description="Listing not found.")})
     def get(self, request, listing_id):
         listing = self.get_listing(listing_id)

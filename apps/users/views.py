@@ -58,6 +58,11 @@ class UserAdminMixin:
 
 @extend_schema(tags=["Users"])
 class UserListCreateView(UserAdminMixin, APIView):
+    permission_codes = {
+        "GET": "users.list",
+        "POST": "users.create",
+    }
+
     @extend_schema(responses={200: ManagedUserSerializer(many=True)})
     def get(self, request):
         queryset = self.get_queryset()
@@ -124,6 +129,12 @@ class UserListCreateView(UserAdminMixin, APIView):
 
 @extend_schema(tags=["Users"])
 class UserDetailView(UserAdminMixin, APIView):
+    permission_codes = {
+        "GET": "users.read",
+        "PATCH": "users.update",
+        "DELETE": "users.delete",
+    }
+
     @extend_schema(responses={200: ManagedUserSerializer, 404: OpenApiResponse(description="User not found.")})
     def get(self, request, user_id):
         user = self.get_user(user_id)
@@ -161,6 +172,11 @@ class UserDetailView(UserAdminMixin, APIView):
 
 @extend_schema(tags=["Roles"])
 class RoleListCreateView(UserAdminMixin, APIView):
+    permission_codes = {
+        "GET": "roles.list",
+        "POST": "roles.create",
+    }
+
     @extend_schema(responses={200: RoleSerializer(many=True)})
     def get(self, request):
         return collection_response(RoleSerializer(Role.objects.all(), many=True).data)
@@ -179,6 +195,13 @@ class RoleListCreateView(UserAdminMixin, APIView):
 
 @extend_schema(tags=["Roles"])
 class RoleDetailView(UserAdminMixin, APIView):
+    permission_codes = {
+        "GET": "roles.read",
+        "PUT": "roles.update",
+        "PATCH": "roles.permissions.update",
+        "DELETE": "roles.delete",
+    }
+
     def get_role(self, role_id):
         return get_object_or_404(Role.objects.all(), Q(public_id=role_id) | Q(code=role_id))
 
@@ -234,6 +257,10 @@ class RoleDetailView(UserAdminMixin, APIView):
 
 @extend_schema(tags=["Permissions"])
 class PermissionListCreateView(UserAdminMixin, APIView):
+    permission_codes = {
+        "GET": "permissions.list",
+    }
+
     @extend_schema(responses={200: PermissionSerializer(many=True)})
     def get(self, request):
         permissions = Permission.objects.all()
@@ -245,6 +272,10 @@ class PermissionListCreateView(UserAdminMixin, APIView):
 
 @extend_schema(tags=["Permissions"])
 class PermissionDetailView(UserAdminMixin, APIView):
+    permission_codes = {
+        "GET": "permissions.read",
+    }
+
     def get_permission(self, permission_id):
         return get_object_or_404(Permission.objects.all(), public_id=permission_id)
 
