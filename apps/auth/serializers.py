@@ -8,7 +8,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from apps.common.validators import validate_international_phone_number
 from .models import EmailVerificationToken, PasswordResetToken, Profile
-from apps.users.models import Role
+from apps.users.models import Permission, Role
 
 User = get_user_model()
 
@@ -30,10 +30,11 @@ class ProfileSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     user_id = serializers.SerializerMethodField()
     profile = serializers.SerializerMethodField()
+    permissions = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["user_id", "username", "email", "first_name", "last_name", "profile"]
+        fields = ["user_id", "username", "email", "first_name", "last_name", "profile", "permissions"]
         read_only_fields = ["user_id"]
 
     @extend_schema_field(serializers.CharField)
@@ -45,6 +46,16 @@ class UserSerializer(serializers.ModelSerializer):
     def get_profile(self, user):
         profile, _created = Profile.objects.get_or_create(user=user)
         return ProfileSerializer(profile).data
+
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
+    def get_permissions(self, user):
+        profile, _created = Profile.objects.get_or_create(user=user)
+        return list(
+            Permission.objects.filter(role_links__role=profile.role)
+            .order_by("code")
+            .values_list("code", flat=True)
+            .distinct()
+        )
 
 
 class RegisterSerializer(serializers.ModelSerializer):
