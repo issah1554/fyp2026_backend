@@ -30,11 +30,10 @@ class ProfileSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     user_id = serializers.SerializerMethodField()
     profile = serializers.SerializerMethodField()
-    permissions = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["user_id", "username", "email", "first_name", "last_name", "profile", "permissions"]
+        fields = ["user_id", "username", "email", "first_name", "last_name", "profile"]
         read_only_fields = ["user_id"]
 
     @extend_schema_field(serializers.CharField)
@@ -47,6 +46,13 @@ class UserSerializer(serializers.ModelSerializer):
         profile, _created = Profile.objects.get_or_create(user=user)
         return ProfileSerializer(profile).data
 
+
+class LoginUserSerializer(UserSerializer):
+    permissions = serializers.SerializerMethodField()
+
+    class Meta(UserSerializer.Meta):
+        fields = [*UserSerializer.Meta.fields, "permissions"]
+
     @extend_schema_field(serializers.ListField(child=serializers.CharField()))
     def get_permissions(self, user):
         profile, _created = Profile.objects.get_or_create(user=user)
@@ -56,6 +62,10 @@ class UserSerializer(serializers.ModelSerializer):
             .values_list("code", flat=True)
             .distinct()
         )
+
+
+class SessionUserSerializer(LoginUserSerializer):
+    pass
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -114,7 +124,7 @@ class AuthTokenObtainPairSerializer(TokenObtainPairSerializer):
         profile, _created = Profile.objects.get_or_create(user=self.user)
         if not profile.is_email_verified:
             raise AuthenticationFailed("Email address is not verified.")
-        data["user"] = UserSerializer(self.user).data
+        data["user"] = LoginUserSerializer(self.user).data
         return data
 
 

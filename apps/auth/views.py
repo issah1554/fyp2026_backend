@@ -14,6 +14,7 @@ from .serializers import (
     PasswordResetRequestSerializer,
     RegisterSerializer,
     ResendEmailVerificationSerializer,
+    SessionUserSerializer,
     UserSerializer,
     VerifyEmailSerializer,
 )
@@ -171,9 +172,9 @@ class MeView(APIView):
         "DELETE": "auth.account.delete",
     }
 
-    @extend_schema(responses={200: UserSerializer})
+    @extend_schema(responses={200: SessionUserSerializer})
     def get(self, request):
-        return success_response(UserSerializer(request.user).data)
+        return success_response(SessionUserSerializer(request.user).data)
 
     @extend_schema(
         request=AccountDeletionSerializer,
