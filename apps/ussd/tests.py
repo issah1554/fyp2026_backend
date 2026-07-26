@@ -7,7 +7,7 @@ from .models import UssdPriceAlert, UssdSubscriber
 class UssdMenuViewTests(TestCase):
     def test_unregistered_user_is_prompted_to_register(self):
         response = self.client.post(
-            reverse("ussd:menu-no-slash"),
+            reverse("ussd:menu"),
             data={
                 "sessionId": "ATUssdSession123",
                 "serviceCode": "*384*83342#",

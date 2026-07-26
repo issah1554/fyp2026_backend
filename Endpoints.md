@@ -144,8 +144,6 @@ Permission notes:
 | --- | --- | --- | --- | --- | --- |
 | GET | `/ussd/menu` | Public | None | Working | USSD gateway callback. Accepts `sessionId`, `serviceCode`, `phoneNumber`, and `text` from query parameters or headers. Returns `text/plain` with `CON` or `END` response text. |
 | POST | `/ussd/menu` | Public | None | Working | USSD gateway callback. Accepts form fields `sessionId`, `serviceCode`, `phoneNumber`, and `text`. Returns `text/plain` with `CON` or `END` response text. |
-| GET | `/ussd/menu/` | Public | None | Working | Slash-suffixed alias for the USSD gateway callback. |
-| POST | `/ussd/menu/` | Public | None | Working | Slash-suffixed alias for the USSD gateway callback. |
 
 ## API Documentation
 
