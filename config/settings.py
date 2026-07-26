@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     "apps.areas.apps.AreasConfig",
     "apps.listings.apps.ListingsConfig",
     "apps.orders.apps.OrdersConfig",
+    "apps.ussd.apps.UsspConfig",
 ]
 
 MIDDLEWARE = [
