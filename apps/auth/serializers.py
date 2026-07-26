@@ -113,9 +113,28 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class AuthTokenObtainPairSerializer(TokenObtainPairSerializer):
+    email = serializers.EmailField(required=False, write_only=True)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields[self.username_field].required = False
+
     def validate(self, attrs):
         username = attrs.get(self.username_field)
-        if username and "@" in username:
+        email = attrs.get("email")
+
+        if not username and not email:
+            raise serializers.ValidationError({
+                self.username_field: ["This field or email is required."]
+            })
+
+        if email:
+            user = User.objects.filter(email__iexact=email).first()
+            if user is not None:
+                attrs[self.username_field] = getattr(user, self.username_field)
+            else:
+                attrs[self.username_field] = email
+        elif username and "@" in username:
             user = User.objects.filter(email__iexact=username).first()
             if user is not None:
                 attrs[self.username_field] = getattr(user, self.username_field)
