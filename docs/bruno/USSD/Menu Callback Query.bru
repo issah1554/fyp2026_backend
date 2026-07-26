@@ -1,0 +1,11 @@
+meta {
+  name: Menu Callback Query
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{base_url}}/ussd/menu?sessionId={{ussd_session_id}}&serviceCode={{ussd_service_code}}&phoneNumber={{ussd_phone_number}}&text={{ussd_text}}
+  body: none
+  auth: none
+}

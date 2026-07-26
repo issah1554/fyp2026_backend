@@ -217,10 +217,11 @@ class UssdMenuView(View):
         text = self._get_value(request, "text")
 
         _ = session_id, service_code, phone_number
+        raw_segments = [segment.strip() for segment in text.split("*") if segment.strip()]
         segments = self._normalize_segments(text)
         subscriber = UssdSubscriber.objects.filter(phone_number=phone_number).first()
 
-        if self._is_exit(segments):
+        if self._is_exit(raw_segments):
             response_text = "END Thank you for using SmartMarket DSS. Asante! Kwa heri."
         elif subscriber is None:
             response_text = self._handle_registration(phone_number, segments)

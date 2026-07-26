@@ -138,10 +138,21 @@ Permission notes:
 | GET | `/api/v1/orders/{order_id}` | `orders.read` | Bearer token | Working | Owner/participant rule. Get order by public ID. |
 | PATCH | `/api/v1/orders/{order_id}` | `orders.update` | Bearer token | Working | Owner/participant rule. Update order by public ID. |
 
+## USSD
+
+| Method | Path | Permission Code | Auth | Status | Notes |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/ussd/menu` | Public | None | Working | USSD gateway callback. Accepts `sessionId`, `serviceCode`, `phoneNumber`, and `text` from query parameters or headers. Returns `text/plain` with `CON` or `END` response text. |
+| POST | `/ussd/menu` | Public | None | Working | USSD gateway callback. Accepts form fields `sessionId`, `serviceCode`, `phoneNumber`, and `text`. Returns `text/plain` with `CON` or `END` response text. |
+| GET | `/ussd/menu/` | Public | None | Working | Slash-suffixed alias for the USSD gateway callback. |
+| POST | `/ussd/menu/` | Public | None | Working | Slash-suffixed alias for the USSD gateway callback. |
+
 ## API Documentation
 
 | Method | Path | Permission Code | Auth | Status | Notes |
 | --- | --- | --- | --- | --- | --- |
+| GET | `/` | None | None | Working | Root API health and metadata response. |
+| GET | `/favicon.ico` | None | None | Working | API favicon image. |
 | GET | `/api/schema` | None | None | Working | OpenAPI schema. |
 | GET | `/api/docs` | None | None | Working | Swagger UI documentation. |
 

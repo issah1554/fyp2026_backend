@@ -56,4 +56,5 @@ urlpatterns = [
     path("api/v1/", include("apps.areas.urls")),
     path("api/v1/", include("apps.listings.urls")),
     path("api/v1/", include("apps.orders.urls")),
+    path("ussd/", include("apps.ussd.urls")),
 ]
