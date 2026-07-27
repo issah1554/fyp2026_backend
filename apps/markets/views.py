@@ -62,7 +62,6 @@ class MarketMixin:
 @extend_schema(tags=["Markets"])
 class MarketListCreateView(MarketMixin, APIView):
     permission_codes = {
-        "GET": "markets.list",
         "POST": "markets.create",
     }
 
@@ -109,7 +108,6 @@ class MarketListCreateView(MarketMixin, APIView):
 @extend_schema(tags=["Markets"])
 class MarketDetailView(MarketMixin, APIView):
     permission_codes = {
-        "GET": "markets.read",
         "PATCH": "markets.update",
         "DELETE": "markets.delete",
     }
@@ -158,7 +156,6 @@ class MarketPriceMixin:
 @extend_schema(tags=["Market Prices"])
 class MarketPriceListCreateView(MarketPriceMixin, APIView):
     permission_codes = {
-        "GET": "market_prices.list",
         "POST": "market_prices.create",
     }
 
@@ -213,7 +210,6 @@ class MarketPriceListCreateView(MarketPriceMixin, APIView):
 @extend_schema(tags=["Market Prices"])
 class MarketPriceDetailView(MarketPriceMixin, APIView):
     permission_codes = {
-        "GET": "market_prices.read",
         "PATCH": "market_prices.update",
         "DELETE": "market_prices.delete",
     }
@@ -245,7 +241,6 @@ class MarketPriceDetailView(MarketPriceMixin, APIView):
 @extend_schema(tags=["Market Prices"])
 class MarketNestedPriceListCreateView(MarketPriceMixin, APIView):
     permission_codes = {
-        "GET": "market_prices.list",
         "POST": "market_prices.create",
     }
 
@@ -282,10 +277,6 @@ class MarketNestedPriceListCreateView(MarketPriceMixin, APIView):
 
 @extend_schema(tags=["Market Prices"])
 class MarketLatestPricesView(MarketPriceMixin, APIView):
-    permission_codes = {
-        "GET": "market_prices.latest",
-    }
-
     @extend_schema(responses={200: MarketCommodityPriceSerializer(many=True)})
     def get(self, request, market_id):
         market = get_object_or_404(Market.objects.all(), public_id=market_id)
@@ -303,10 +294,6 @@ class MarketLatestPricesView(MarketPriceMixin, APIView):
 
 @extend_schema(tags=["Commodity Prices"])
 class CommodityPricesView(MarketPriceMixin, APIView):
-    permission_codes = {
-        "GET": "commodity_prices.list",
-    }
-
     @extend_schema(responses={200: MarketCommodityPriceSerializer(many=True)})
     def get(self, request, commodity_id):
         get_object_or_404(Commodity.objects.all(), public_id=commodity_id)
@@ -324,17 +311,11 @@ class CommodityPricesView(MarketPriceMixin, APIView):
 
 @extend_schema(tags=["Commodity Prices"])
 class CommodityPriceHistoryView(CommodityPricesView):
-    permission_codes = {
-        "GET": "commodity_prices.history",
-    }
+    pass
 
 
 @extend_schema(tags=["Commodity Prices"])
 class CommodityPriceComparisonView(MarketPriceMixin, APIView):
-    permission_codes = {
-        "GET": "commodity_prices.compare",
-    }
-
     @extend_schema(responses={200: MarketCommodityPriceSerializer(many=True)})
     def get(self, request, commodity_id):
         get_object_or_404(Commodity.objects.all(), public_id=commodity_id)

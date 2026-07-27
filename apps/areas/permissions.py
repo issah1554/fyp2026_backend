@@ -1,5 +1,5 @@
-from apps.common.permissions import HasPermissionCode
+from apps.common.permissions import PublicReadPermissionCode
 
 
-class IsAdminOrReadOnly(HasPermissionCode):
+class IsAdminOrReadOnly(PublicReadPermissionCode):
     message = "You do not have permission to manage administrative areas."

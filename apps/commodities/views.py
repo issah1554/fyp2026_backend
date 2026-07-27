@@ -46,7 +46,6 @@ class CommodityCategoryMixin:
 @extend_schema(tags=["Commodity Categories"])
 class CommodityCategoryListCreateView(CommodityCategoryMixin, APIView):
     permission_codes = {
-        "GET": "commodities.categories.list",
         "POST": "commodities.categories.create",
     }
 
@@ -70,7 +69,6 @@ class CommodityCategoryListCreateView(CommodityCategoryMixin, APIView):
 @extend_schema(tags=["Commodity Categories"])
 class CommodityCategoryDetailView(CommodityCategoryMixin, APIView):
     permission_codes = {
-        "GET": "commodities.categories.read",
         "PATCH": "commodities.categories.update",
         "DELETE": "commodities.categories.delete",
     }
@@ -112,7 +110,6 @@ class CommodityUnitMixin:
 @extend_schema(tags=["Commodity Units"])
 class CommodityUnitListCreateView(CommodityUnitMixin, APIView):
     permission_codes = {
-        "GET": "commodities.units.list",
         "POST": "commodities.units.create",
     }
 
@@ -136,7 +133,6 @@ class CommodityUnitListCreateView(CommodityUnitMixin, APIView):
 @extend_schema(tags=["Commodity Units"])
 class CommodityUnitDetailView(CommodityUnitMixin, APIView):
     permission_codes = {
-        "GET": "commodities.units.read",
         "PATCH": "commodities.units.update",
         "DELETE": "commodities.units.delete",
     }
@@ -178,7 +174,6 @@ class CommodityMixin:
 @extend_schema(tags=["Commodities"])
 class CommodityListCreateView(CommodityMixin, APIView):
     permission_codes = {
-        "GET": "commodities.list",
         "POST": "commodities.create",
     }
 
@@ -238,7 +233,6 @@ class CommodityListCreateView(CommodityMixin, APIView):
 @extend_schema(tags=["Commodities"])
 class CommodityDetailView(CommodityMixin, APIView):
     permission_codes = {
-        "GET": "commodities.read",
         "PATCH": "commodities.update",
         "DELETE": "commodities.delete",
     }

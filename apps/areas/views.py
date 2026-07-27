@@ -129,7 +129,6 @@ class AdmAreaMixin:
 @extend_schema(tags=["Administrative Areas"])
 class AdmAreaListCreateView(AdmAreaMixin, APIView):
     permission_codes = {
-        "GET": "areas.list",
         "POST": "areas.create",
     }
 
@@ -257,7 +256,6 @@ class AdmAreaBulkCreateView(AdmAreaMixin, APIView):
 @extend_schema(tags=["Administrative Areas"])
 class AdmAreaDetailView(AdmAreaMixin, APIView):
     permission_codes = {
-        "GET": "areas.read",
         "PATCH": "areas.update",
         "DELETE": "areas.delete",
     }

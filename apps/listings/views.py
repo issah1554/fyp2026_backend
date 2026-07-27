@@ -24,7 +24,6 @@ class CommodityListingMixin:
 @extend_schema(tags=["Commodity Listings"])
 class CommodityListingListCreateView(CommodityListingMixin, APIView):
     permission_codes = {
-        "GET": "listings.list",
         "POST": "listings.create",
     }
 
@@ -63,7 +62,6 @@ class CommodityListingListCreateView(CommodityListingMixin, APIView):
 @extend_schema(tags=["Commodity Listings"])
 class CommodityListingDetailView(CommodityListingMixin, APIView):
     permission_codes = {
-        "GET": "listings.read",
         "PATCH": "listings.update",
         "DELETE": "listings.delete",
     }

@@ -1,4 +1,4 @@
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 from apps.auth.models import Profile
 
@@ -23,3 +23,10 @@ class HasPermissionCode(BasePermission):
         if not permission_code:
             return not hasattr(view, request.method.lower())
         return user_has_permission_code(request.user, permission_code)
+
+
+class PublicReadPermissionCode(HasPermissionCode):
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True
+        return super().has_permission(request, view)

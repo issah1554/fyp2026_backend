@@ -1,5 +1,5 @@
-from apps.common.permissions import HasPermissionCode
+from apps.common.permissions import PublicReadPermissionCode
 
 
-class HasMarketPermission(HasPermissionCode):
+class HasMarketPermission(PublicReadPermissionCode):
     message = "You do not have permission to access markets."
