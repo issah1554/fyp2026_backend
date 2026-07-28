@@ -8,6 +8,7 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
 from apps.auth.models import Profile
+from apps.users.models import Role
 
 from .forecasting import (
     ForecastUnavailable,
@@ -20,6 +21,10 @@ from .forecasting import (
 from .models import UssdPriceAlert, UssdSubscriber
 from .prediction_cache import get_cached_prediction
 from .recommendations import get_cached_recommendation
+from .market_prices_api import (
+    LiveMarketPricesUnavailable,
+    get_market_price_service,
+)
 from .weather import (
     WeatherForecastUnavailable,
     get_weather_region_options,
@@ -40,16 +45,24 @@ COMMODITY_MAP = {
     "2": ("rice", "Rice"),
 }
 
-MARKET_PRICE_DATA = {
-    ("1", "1"): "END Maize at Ifakara Central: Current TZS 820/kg, Yesterday TZS 790/kg, Trend: Rising.",
-    ("1", "2"): "END Maize in Nearby Markets: Current TZS 780/kg, Yesterday TZS 800/kg, Trend: Slightly Down.",
-    ("2", "1"): "END Rice at Ifakara Central: Current TZS 2,150/kg, Yesterday TZS 2,120/kg, Trend: Rising.",
-    ("2", "2"): "END Rice in Nearby Markets: Current TZS 2,080/kg, Yesterday TZS 2,060/kg, Trend: Stable Upward.",
-}
-
 @method_decorator(csrf_exempt, name="dispatch")
 class UssdMenuView(View):
     http_method_names = ["get", "post"]
+
+    def _resolve_profile_role(self, role_code):
+        try:
+            role_label = Profile.Role(role_code).label
+        except ValueError:
+            role_label = role_code.replace("_", " ").title()
+        role, _created = Role.objects.get_or_create(
+            code=role_code,
+            defaults={
+                "name": role_label,
+                "description": f"{role_label} role.",
+                "is_system": True,
+            },
+        )
+        return role
 
     def _get_value(self, request, key):
         return (
@@ -146,6 +159,7 @@ class UssdMenuView(View):
     def _sync_backend_profile(self, phone_number, full_name, role):
         profile = Profile.objects.select_related("user").filter(phone_number=phone_number).first()
         first_name, last_name = self._split_name(full_name)
+        profile_role = self._resolve_profile_role(role)
 
         if profile is None:
             user = User(username=phone_number, first_name=first_name, last_name=last_name)
@@ -153,7 +167,7 @@ class UssdMenuView(View):
             user.save()
             profile = Profile.objects.create(
                 user=user,
-                role=role,
+                role=profile_role,
                 phone_number=phone_number,
                 email_verified_at=timezone.now(),
             )
@@ -166,7 +180,7 @@ class UssdMenuView(View):
         user.save(update_fields=["username", "first_name", "last_name"])
 
         update_fields = ["role", "phone_number", "updated_at"]
-        profile.role = role
+        profile.role = profile_role
         profile.phone_number = phone_number
         profile.save(update_fields=update_fields)
         return user, profile
@@ -197,16 +211,100 @@ class UssdMenuView(View):
         return self._main_menu()
 
     def _handle_market_prices(self, segments):
+        service = get_market_price_service()
         if len(segments) == 1:
-            return "CON Select commodity\n1. Maize\n2. Rice\n0. Back"
+            try:
+                market_lines = [f"{option}. {item['name']}" for option, item in service.get_market_options()]
+            except LiveMarketPricesUnavailable:
+                return "END Market prices not available right now."
+            return "CON Select market\n" + "\n".join(market_lines) + "\n0. Back"
         if len(segments) == 2:
-            if segments[1] not in COMMODITY_MAP:
-                return "END Invalid commodity selection."
-            return "CON Select market\n1. Ifakara Central\n2. Nearby Markets\n0. Back"
+            try:
+                market_lookup = dict(service.get_market_options())
+                selected_market = market_lookup.get(segments[1])
+                if selected_market is None:
+                    return "END Invalid market selection."
+                commodity_lines = [
+                    f"{option}. {item['name']}"
+                    for option, item in service.get_commodity_options(selected_market["market_id"])
+                ]
+            except LiveMarketPricesUnavailable:
+                return "END Market prices not available right now."
+            if not commodity_lines:
+                return "END No commodities available for this market right now."
+            return "CON Select commodity\n" + "\n".join(commodity_lines) + "\n0. Back"
         if len(segments) == 3:
-            return MARKET_PRICE_DATA.get(
-                (segments[1], segments[2]),
-                "END Invalid market selection.",
+            try:
+                market_lookup = dict(service.get_market_options())
+                selected_market = market_lookup.get(segments[1])
+                if selected_market is None:
+                    return "END Invalid market selection."
+                commodity_lookup = dict(service.get_commodity_options(selected_market["market_id"]))
+                selected_commodity = commodity_lookup.get(segments[2])
+                if selected_commodity is None:
+                    return "END Invalid commodity selection."
+                price_type_lines = [
+                    f"{option}. {item['label']}"
+                    for option, item in service.get_price_type_options(
+                        selected_market["market_id"],
+                        selected_commodity["commodity_id"],
+                    )
+                ]
+            except LiveMarketPricesUnavailable:
+                return "END Market prices not available right now."
+            if not price_type_lines:
+                return "END No price types available for this commodity right now."
+            return "CON Select price type\n" + "\n".join(price_type_lines) + "\n0. Back"
+        if len(segments) == 4:
+            try:
+                market_lookup = dict(service.get_market_options())
+                selected_market = market_lookup.get(segments[1])
+                if selected_market is None:
+                    return "END Invalid market selection."
+                commodity_lookup = dict(service.get_commodity_options(selected_market["market_id"]))
+                selected_commodity = commodity_lookup.get(segments[2])
+                if selected_commodity is None:
+                    return "END Invalid commodity selection."
+                price_type_lookup = dict(
+                    service.get_price_type_options(
+                        selected_market["market_id"],
+                        selected_commodity["commodity_id"],
+                    )
+                )
+                selected_price_type = price_type_lookup.get(segments[3])
+                if selected_price_type is None:
+                    return "END Invalid price type."
+                price_data = service.get_market_price(
+                    selected_market["market_id"],
+                    selected_commodity["commodity_id"],
+                    selected_price_type["value"],
+                )
+            except LiveMarketPricesUnavailable:
+                return "END Market prices not available right now."
+            min_price = (
+                f"{price_data['currency']} {Decimal(price_data['min_price']):,.2f}"
+                if price_data.get("min_price") is not None
+                else "Not available"
+            )
+            max_price = (
+                f"{price_data['currency']} {Decimal(price_data['max_price']):,.2f}"
+                if price_data.get("max_price") is not None
+                else "Not available"
+            )
+            current_price = (
+                f"{price_data['currency']} {Decimal(price_data['price']):,.2f}"
+                if price_data.get("price") is not None
+                else "Not available"
+            )
+            return (
+                "END Market Price\n"
+                f"Market: {price_data['market']}\n"
+                f"Commodity: {price_data['commodity']}\n"
+                f"Type: {price_data['pricetype']}\n"
+                f"Date: {price_data['price_date']}\n"
+                f"Current Price: {current_price}\n"
+                f"Min Price: {min_price}\n"
+                f"Max Price: {max_price}"
             )
         return "END Invalid choice."
 
@@ -372,17 +470,18 @@ class UssdMenuView(View):
         return "END Invalid choice."
 
     def _profile_for_subscriber(self, subscriber):
+        profile_role = self._resolve_profile_role(subscriber.role)
         if subscriber.user_id:
             profile, _created = Profile.objects.get_or_create(
                 user=subscriber.user,
                 defaults={
-                    "role": subscriber.role,
+                    "role": profile_role,
                     "phone_number": subscriber.phone_number,
                 },
             )
             profile_needs_update = False
-            if profile.role != subscriber.role:
-                profile.role = subscriber.role
+            if profile.role_id != profile_role.id:
+                profile.role = profile_role
                 profile_needs_update = True
             if not profile.phone_number:
                 profile.phone_number = subscriber.phone_number
@@ -463,9 +562,10 @@ class UssdMenuView(View):
                 role = ROLE_MAP.get(segments[2])
                 if role is None:
                     return "END Invalid role selection."
+                profile_role = self._resolve_profile_role(role)
                 subscriber.role = role
                 subscriber.save(update_fields=["role", "updated_at"])
-                profile.role = role
+                profile.role = profile_role
                 profile.save(update_fields=["role", "updated_at"])
                 return f"END Role updated to {subscriber.get_role_display()}."
             if segments[1] == "3":

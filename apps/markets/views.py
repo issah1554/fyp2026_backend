@@ -174,6 +174,7 @@ class MarketPriceListCreateView(MarketPriceMixin, APIView):
         queryset = self.get_queryset()
         market_id = request.query_params.get("market_id")
         commodity_id = request.query_params.get("commodity_id")
+        pricetype = request.query_params.get("pricetype")
         price_date = request.query_params.get("price_date")
         date_from = request.query_params.get("date_from")
         date_to = request.query_params.get("date_to")
@@ -182,6 +183,8 @@ class MarketPriceListCreateView(MarketPriceMixin, APIView):
             queryset = queryset.filter(market__public_id=market_id)
         if commodity_id:
             queryset = queryset.filter(commodity__public_id=commodity_id)
+        if pricetype:
+            queryset = queryset.filter(pricetype=pricetype)
         if price_date:
             queryset = queryset.filter(price_date=price_date)
         if date_from:
@@ -197,6 +200,7 @@ class MarketPriceListCreateView(MarketPriceMixin, APIView):
                 "filters": {
                     "market_id": market_id or "",
                     "commodity_id": commodity_id or "",
+                    "pricetype": pricetype or "",
                     "price_date": price_date or "",
                     "date_from": date_from or "",
                     "date_to": date_to or "",
@@ -267,13 +271,16 @@ class MarketNestedPriceListCreateView(MarketPriceMixin, APIView):
         market = get_object_or_404(Market.objects.all(), public_id=market_id)
         queryset = self.get_queryset().filter(market=market)
         commodity_id = request.query_params.get("commodity_id")
+        pricetype = request.query_params.get("pricetype")
         if commodity_id:
             queryset = queryset.filter(commodity__public_id=commodity_id)
+        if pricetype:
+            queryset = queryset.filter(pricetype=pricetype)
         return paginated_response(
             request,
             queryset,
             MarketCommodityPriceSerializer,
-            extra_meta={"filters": {"market_id": market_id, "commodity_id": commodity_id or ""}},
+            extra_meta={"filters": {"market_id": market_id, "commodity_id": commodity_id or "", "pricetype": pricetype or ""}},
         )
 
     @extend_schema(request=MarketCommodityPriceSerializer, responses={201: MarketCommodityPriceSerializer})
@@ -321,13 +328,16 @@ class CommodityPricesView(MarketPriceMixin, APIView):
         get_object_or_404(Commodity.objects.all(), public_id=commodity_id)
         queryset = self.get_queryset().filter(commodity__public_id=commodity_id)
         market_id = request.query_params.get("market_id")
+        pricetype = request.query_params.get("pricetype")
         if market_id:
             queryset = queryset.filter(market__public_id=market_id)
+        if pricetype:
+            queryset = queryset.filter(pricetype=pricetype)
         return paginated_response(
             request,
             queryset,
             MarketCommodityPriceSerializer,
-            extra_meta={"filters": {"commodity_id": commodity_id, "market_id": market_id or ""}},
+            extra_meta={"filters": {"commodity_id": commodity_id, "market_id": market_id or "", "pricetype": pricetype or ""}},
         )
 
 

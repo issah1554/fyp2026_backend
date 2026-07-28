@@ -76,6 +76,10 @@ class Market(models.Model):
 
 
 class MarketCommodityPrice(models.Model):
+    class PriceType(models.TextChoices):
+        RETAIL = "Retail", "Retail"
+        WHOLESALE = "Wholesale", "Wholesale"
+
     public_id = models.CharField(max_length=10, unique=True, editable=False)
     market = models.ForeignKey(
         Market,
@@ -86,6 +90,12 @@ class MarketCommodityPrice(models.Model):
         "commodities.Commodity",
         on_delete=models.CASCADE,
         related_name="market_prices",
+    )
+    pricetype = models.CharField(
+        max_length=32,
+        choices=PriceType.choices,
+        null=True,
+        blank=True,
     )
     price = models.DecimalField(max_digits=12, decimal_places=2)
     min_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
@@ -120,7 +130,7 @@ class MarketCommodityPrice(models.Model):
         ]
         constraints = [
             models.UniqueConstraint(
-                fields=["market", "commodity", "price_date"],
+                fields=["market", "commodity", "price_date", "pricetype"],
                 condition=models.Q(deleted_at__isnull=True),
                 name="market_commodity_price_unique",
             )
@@ -138,4 +148,6 @@ class MarketCommodityPrice(models.Model):
         self.save(update_fields=["deleted_at", "updated_at"])
 
     def __str__(self):
+        if self.pricetype:
+            return f"{self.commodity} ({self.pricetype}) at {self.market} on {self.price_date}"
         return f"{self.commodity} at {self.market} on {self.price_date}"

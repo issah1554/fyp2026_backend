@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from apps.auth.models import Profile
 from apps.commodities.models import Market
+from apps.users.models import Role
 from apps.ussd.forecasting import calendar_week_end_date
 
 from .models import (
@@ -20,6 +21,9 @@ from .models import (
 
 
 class UssdMenuViewTests(TestCase):
+    def _get_role(self, code):
+        return Role.objects.get(code=code)
+
     def test_unregistered_user_is_prompted_to_register(self):
         response = self.client.post(
             reverse("ussd:menu"),
@@ -64,7 +68,7 @@ class UssdMenuViewTests(TestCase):
         subscriber = UssdSubscriber.objects.get(phone_number="+254700000001")
         self.assertIsNotNone(subscriber.user)
         profile = Profile.objects.get(user=subscriber.user)
-        self.assertEqual(profile.role, Profile.Role.FARMER)
+        self.assertEqual(profile.role.code, Profile.Role.FARMER)
         self.assertEqual(profile.phone_number, "+254700000001")
 
     @patch("apps.ussd.views.get_forecast_service")
@@ -136,14 +140,14 @@ class UssdMenuViewTests(TestCase):
         self.assertContains(buyer_response, "CON Main Menu")
         entrepreneur_profile = Profile.objects.get(phone_number="+254700000010")
         buyer_profile = Profile.objects.get(phone_number="+254700000011")
-        self.assertEqual(entrepreneur_profile.role, Profile.Role.ENTREPRENEUR)
-        self.assertEqual(buyer_profile.role, Profile.Role.BUYER)
+        self.assertEqual(entrepreneur_profile.role.code, Profile.Role.ENTREPRENEUR)
+        self.assertEqual(buyer_profile.role.code, Profile.Role.BUYER)
 
     def test_registered_farmer_can_update_farm_location_and_group(self):
         user = get_user_model().objects.create(username="+254700000001")
         profile = Profile.objects.create(
             user=user,
-            role=Profile.Role.FARMER,
+            role=self._get_role(Profile.Role.FARMER),
             phone_number="+254700000001",
         )
         subscriber = UssdSubscriber.objects.create(
@@ -183,7 +187,7 @@ class UssdMenuViewTests(TestCase):
         user = get_user_model().objects.create(username="+254700000001")
         Profile.objects.create(
             user=user,
-            role=Profile.Role.FARMER,
+            role=self._get_role(Profile.Role.FARMER),
             phone_number="+254700000001",
             farm_location="Morogoro Rural",
             farm_group="Tupendane Farmers",
@@ -209,6 +213,84 @@ class UssdMenuViewTests(TestCase):
         self.assertContains(response, "Farm Group: Tupendane Farmers")
         self.assertContains(response, "Maize Alert: Not set")
         self.assertContains(response, "Rice Alert: Not set")
+
+    @patch("apps.ussd.views.get_market_price_service")
+    def test_market_prices_menu_uses_live_market_price_service(self, mock_service_factory):
+        subscriber = UssdSubscriber.objects.create(
+            phone_number="+254700000031",
+            full_name="Market Price User",
+            role=UssdSubscriber.Role.FARMER,
+        )
+        service = mock_service_factory.return_value
+        service.get_market_options.return_value = [
+            ("1", {"market_id": "market-1", "name": "Soko Matola"}),
+        ]
+        service.get_commodity_options.return_value = [
+            ("1", {"commodity_id": "commodity-1", "name": "Rice"}),
+        ]
+        service.get_price_type_options.return_value = [
+            ("1", {"value": "Retail", "label": "Retail"}),
+        ]
+        service.get_market_price.return_value = {
+            "market": "Soko Matola",
+            "commodity": "Rice",
+            "pricetype": "Retail",
+            "currency": "TZS",
+            "price": "10009.00",
+            "min_price": "9500.00",
+            "max_price": "10500.00",
+            "price_date": "2026-07-28",
+        }
+
+        market_response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession131",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": subscriber.phone_number,
+                "text": "1",
+            },
+        )
+        commodity_response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession131",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": subscriber.phone_number,
+                "text": "1*1",
+            },
+        )
+        price_type_response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession131",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": subscriber.phone_number,
+                "text": "1*1*1",
+            },
+        )
+        price_response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession131",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": subscriber.phone_number,
+                "text": "1*1*1*1",
+            },
+        )
+
+        self.assertContains(market_response, "CON Select market")
+        self.assertContains(market_response, "Soko Matola")
+        self.assertContains(commodity_response, "CON Select commodity")
+        self.assertContains(commodity_response, "Rice")
+        self.assertContains(price_type_response, "CON Select price type")
+        self.assertContains(price_type_response, "Retail")
+        self.assertContains(price_response, "END Market Price")
+        self.assertContains(price_response, "Market: Soko Matola")
+        self.assertContains(price_response, "Commodity: Rice")
+        self.assertContains(price_response, "Type: Retail")
+        self.assertContains(price_response, "Min Price: TZS 9,500.00")
+        self.assertContains(price_response, "Max Price: TZS 10,500.00")
 
     @patch("apps.ussd.views.get_forecast_service")
     def test_registered_user_can_get_market_prediction_for_selected_options(self, mock_service_factory):
@@ -529,7 +611,7 @@ class UssdMenuViewTests(TestCase):
         user = get_user_model().objects.create(username="+254700000001")
         Profile.objects.create(
             user=user,
-            role=Profile.Role.FARMER,
+            role=self._get_role(Profile.Role.FARMER),
             phone_number="+254700000001",
         )
         subscriber = UssdSubscriber.objects.create(
