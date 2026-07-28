@@ -13,11 +13,11 @@ Permission notes:
 
 | Method | Path | Permission Code | Auth | Status | Notes |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/auth/register` | Public | None | Working | Register new user and send email verification token. |
+| POST | `/api/v1/auth/register` | Public | None | Working | Register new user and send email verification code. |
 | POST | `/api/v1/auth/login` | Public | None | Working | Login with username/email and password. |
 | POST | `/api/v1/auth/token/refresh` | Public | None | Working | Refresh access token. |
 | POST | `/api/v1/auth/email/verify` | Public | None | Working | Verify registered user email. |
-| POST | `/api/v1/auth/email/resend` | Public | None | Working | Resend email verification token. |
+| POST | `/api/v1/auth/email/resend` | Public | None | Working | Resend email verification code. |
 | POST | `/api/v1/auth/password/reset/request` | Public | None | Working | Request password reset link. |
 | POST | `/api/v1/auth/password/reset/confirm` | Public | None | Working | Reset password with token. |
 | GET | `/api/v1/auth/me` | `auth.me` | Bearer token | Working | Get current authenticated user profile. |

@@ -46,16 +46,16 @@ class AuthApiTests(APITestCase):
         self.assertEqual(EmailVerificationToken.objects.count(), 1)
         self.assertEqual(len(mail.outbox), 1)
         verification_token = EmailVerificationToken.objects.get()
-        self.assertIn(
-            f"http://localhost:3000/auth/email-verification?token={verification_token.token}",
-            mail.outbox[0].body,
-        )
+        self.assertRegex(verification_token.token, r"^\d{6}$")
+        self.assertIn(verification_token.token, mail.outbox[0].body)
+        self.assertIn("using this code", mail.outbox[0].body)
+        self.assertNotIn("/auth/email-verification?token=", mail.outbox[0].body)
         self.assertNotIn("Or copy this token", mail.outbox[0].body)
         self.assertEqual(len(mail.outbox[0].alternatives), 1)
-        self.assertIn("Verify email", mail.outbox[0].alternatives[0][0])
+        self.assertIn(verification_token.token, mail.outbox[0].alternatives[0][0])
         self.assertIn("text/html", mail.outbox[0].alternatives[0][1])
 
-    def test_registration_verification_email_uses_request_origin(self):
+    def test_registration_verification_email_uses_code_not_request_origin(self):
         response = self.client.post(
             "/api/v1/auth/register",
             {
@@ -72,10 +72,8 @@ class AuthApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         verification_token = EmailVerificationToken.objects.get()
-        self.assertIn(
-            f"https://fyp2026-web.vercel.app/auth/email-verification?token={verification_token.token}",
-            mail.outbox[0].body,
-        )
+        self.assertIn(verification_token.token, mail.outbox[0].body)
+        self.assertNotIn("https://fyp2026-web.vercel.app", mail.outbox[0].body)
 
     def test_registration_validation_errors_use_response_schema(self):
         response = self.client.post(
@@ -147,13 +145,13 @@ class AuthApiTests(APITestCase):
         Profile.objects.create(user=user)
         verification_token = EmailVerificationToken.objects.create(
             user=user,
-            token="valid-token",
+            token="123456",
             expires_at=timezone.now() + timedelta(hours=1),
         )
 
         response = self.client.post(
             "/api/v1/auth/email/verify",
-            {"token": verification_token.token},
+            {"email": "amina@example.com", "code": verification_token.token},
             format="json",
         )
 
@@ -287,10 +285,9 @@ class AuthApiTests(APITestCase):
         self.assertEqual(EmailVerificationToken.objects.count(), 1)
         self.assertEqual(len(mail.outbox), 1)
         verification_token = EmailVerificationToken.objects.get()
-        self.assertIn(
-            f"https://fyp2026-web.vercel.app/auth/email-verification?token={verification_token.token}",
-            mail.outbox[0].body,
-        )
+        self.assertRegex(verification_token.token, r"^\d{6}$")
+        self.assertIn(verification_token.token, mail.outbox[0].body)
+        self.assertNotIn("/auth/email-verification?token=", mail.outbox[0].body)
 
     def test_user_can_request_password_reset(self):
         get_user_model().objects.create_user(
