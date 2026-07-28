@@ -1,4 +1,5 @@
 from django.core.paginator import EmptyPage, Paginator
+from django.db import IntegrityError, transaction
 from django.db.models import OuterRef, Subquery
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
@@ -6,7 +7,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 
 from apps.commodities.models import Commodity
-from apps.common.responses import collection_response, mutation_response, success_response
+from apps.common.responses import collection_response, error_response, mutation_response, success_response
 
 from .models import Market, MarketCommodityPrice
 from .permissions import HasMarketPermission
@@ -15,6 +16,7 @@ from .serializers import MarketCommodityPriceSerializer, MarketSerializer
 
 DEFAULT_PAGE_SIZE = 10
 MAX_PAGE_SIZE = 100
+PRICE_UNIQUENESS_ERROR = "A price for this market, commodity, and date already exists."
 
 
 def positive_int(value, default):
@@ -47,6 +49,14 @@ def paginated_response(request, queryset, serializer_class, extra_meta=None):
     if extra_meta:
         meta.update(extra_meta)
     return collection_response(serializer_class(page.object_list, many=True).data, meta=meta)
+
+
+def duplicate_price_response():
+    return error_response(
+        message=PRICE_UNIQUENESS_ERROR,
+        errors={"non_field_errors": [PRICE_UNIQUENESS_ERROR]},
+        status_code=status.HTTP_400_BAD_REQUEST,
+    )
 
 
 class MarketMixin:
@@ -199,7 +209,11 @@ class MarketPriceListCreateView(MarketPriceMixin, APIView):
     def post(self, request):
         serializer = MarketCommodityPriceSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        price = serializer.save()
+        try:
+            with transaction.atomic():
+                price = serializer.save()
+        except IntegrityError:
+            return duplicate_price_response()
         return mutation_response(
             message="Market commodity price created successfully.",
             data=MarketCommodityPriceSerializer(price).data,
@@ -224,7 +238,11 @@ class MarketPriceDetailView(MarketPriceMixin, APIView):
         price = self.get_price(price_id)
         serializer = MarketCommodityPriceSerializer(price, data=request.data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        price = serializer.save()
+        try:
+            with transaction.atomic():
+                price = serializer.save()
+        except IntegrityError:
+            return duplicate_price_response()
         return mutation_response(
             message="Market commodity price updated successfully.",
             data=MarketCommodityPriceSerializer(price).data,
@@ -267,7 +285,11 @@ class MarketNestedPriceListCreateView(MarketPriceMixin, APIView):
             fixed_market=market,
         )
         serializer.is_valid(raise_exception=True)
-        price = serializer.save()
+        try:
+            with transaction.atomic():
+                price = serializer.save()
+        except IntegrityError:
+            return duplicate_price_response()
         return mutation_response(
             message="Market commodity price created successfully.",
             data=MarketCommodityPriceSerializer(price).data,
