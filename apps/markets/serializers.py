@@ -87,6 +87,8 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
             "commodity",
             "commodity_id",
             "price",
+            "min_price",
+            "max_price",
             "currency",
             "price_date",
             "created_by_id",
@@ -118,6 +120,11 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
         return value.upper()
 
     def validate(self, attrs):
+        min_price = attrs.get("min_price", getattr(self.instance, "min_price", None))
+        max_price = attrs.get("max_price", getattr(self.instance, "max_price", None))
+        if min_price is not None and max_price is not None and min_price > max_price:
+            raise serializers.ValidationError("min_price cannot be greater than max_price.")
+
         market = self.fixed_market or attrs.get("market_id") or getattr(self.instance, "market", None)
         commodity = attrs.get("commodity_id") or getattr(self.instance, "commodity", None)
         price_date = attrs.get("price_date") or getattr(self.instance, "price_date", None)

@@ -88,6 +88,8 @@ class MarketCommodityPrice(models.Model):
         related_name="market_prices",
     )
     price = models.DecimalField(max_digits=12, decimal_places=2)
+    min_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    max_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     currency = models.CharField(max_length=3, default="UGX")
     price_date = models.DateField()
     created_by = models.ForeignKey(
