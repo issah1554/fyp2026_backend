@@ -19,6 +19,20 @@ class UssdMenuViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "CON Welcome to SmartMarket DSS.")
 
+    def test_api_v1_ussd_menu_endpoint_matches_gateway_url(self):
+        response = self.client.post(
+            "/api/v1/ussd/menu",
+            data={
+                "sessionId": "ATUssdSession123",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": "+254700000001",
+                "text": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "CON Welcome to SmartMarket DSS.")
+
     def test_registration_flow_saves_subscriber_and_shows_main_menu(self):
         response = self.client.post(
             reverse("ussd:menu"),

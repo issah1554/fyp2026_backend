@@ -6,4 +6,5 @@ app_name = "ussd"
 
 urlpatterns = [
     path("menu", UssdMenuView.as_view(), name="menu"),
+    path("menu/", UssdMenuView.as_view(), name="menu-slash"),
 ]
