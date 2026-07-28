@@ -109,7 +109,6 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "corsheaders",
     "rest_framework",
     "drf_spectacular",
     "apps.auth.apps.AuthConfig",

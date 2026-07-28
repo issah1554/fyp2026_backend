@@ -1,3 +1,6 @@
+from rest_framework.permissions import SAFE_METHODS, BasePermission
+
+from apps.auth.models import Profile
 from apps.common.permissions import PublicReadPermissionCode
 
 

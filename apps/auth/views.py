@@ -12,6 +12,8 @@ from .serializers import (
     AccountDeletionSerializer,
     AuthTokenObtainPairSerializer,
     MobileLoginSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
     RegisterSerializer,
     ResendEmailVerificationSerializer,
     SessionUserSerializer,

@@ -195,6 +195,56 @@ class ResendEmailVerificationSerializer(serializers.Serializer):
         return value
 
 
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        self.context["user"] = User.objects.filter(email__iexact=value).first()
+        return value
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    password = serializers.CharField(write_only=True, min_length=8)
+
+    def validate_token(self, value):
+        reset_token = (
+            PasswordResetToken.objects.select_related("user")
+            .filter(token=value)
+            .first()
+        )
+        if reset_token is None or reset_token.is_used or reset_token.is_expired:
+            raise serializers.ValidationError("Token is invalid or expired.")
+        self.context["reset_token"] = reset_token
+        return value
+
+    def validate_password(self, value):
+        validate_password(value)
+        return value
+
+    @transaction.atomic
+    def save(self, **kwargs):
+        reset_token = self.context["reset_token"]
+        user = reset_token.user
+        user.set_password(self.validated_data["password"])
+        user.save(update_fields=["password"])
+        reset_token.mark_used()
+        return user
+
+
+class AccountDeletionSerializer(serializers.Serializer):
+    password = serializers.CharField(write_only=True)
+
+    def validate_password(self, value):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if user is None or not user.is_authenticated:
+            raise serializers.ValidationError("Authenticated user not found.")
+        if not user.check_password(value):
+            raise serializers.ValidationError("Password is incorrect.")
+        return value
+
+
 class MobileLoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
