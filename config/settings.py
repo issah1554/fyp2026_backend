@@ -54,6 +54,49 @@ SECRET_KEY = os.environ.get(
 DEBUG = os.environ.get("DEBUG", "true").lower() in {"1", "true", "yes", "on"}
 
 ALLOWED_HOSTS = env_list("ALLOWED_HOSTS")
+DEFAULT_ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "localhost",
+    "134.209.77.147",
+    "unable-periscope-boil.ngrok-free.dev",
+]
+DEFAULT_CORS_ALLOWED_ORIGINS = [
+    "http://127.0.0.1:3000",
+    "http://localhost:3000",
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+    "https://unable-periscope-boil.ngrok-free.dev",
+]
+DEFAULT_CSRF_TRUSTED_ORIGINS = [
+    "https://unable-periscope-boil.ngrok-free.dev",
+]
+
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get("ALLOWED_HOSTS", ",".join(DEFAULT_ALLOWED_HOSTS)).split(",")
+    if host.strip()
+]
+
+CORS_ALLOW_ALL_ORIGINS = os.environ.get("CORS_ALLOW_ALL_ORIGINS", "true").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        "CORS_ALLOWED_ORIGINS", ",".join(DEFAULT_CORS_ALLOWED_ORIGINS)
+    ).split(",")
+    if origin.strip()
+]
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        "CSRF_TRUSTED_ORIGINS", ",".join(DEFAULT_CSRF_TRUSTED_ORIGINS)
+    ).split(",")
+    if origin.strip()
+]
 
 
 # Application definition
@@ -66,6 +109,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "corsheaders",
     "rest_framework",
     "drf_spectacular",
     "apps.auth.apps.AuthConfig",

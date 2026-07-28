@@ -23,7 +23,15 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Profile
-        fields = ["role", "phone_number", "organization", "is_email_verified", "email_verified_at"]
+        fields = [
+            "role",
+            "phone_number",
+            "organization",
+            "farm_location",
+            "farm_group",
+            "is_email_verified",
+            "email_verified_at",
+        ]
         read_only_fields = ["email_verified_at"]
 
 
@@ -73,6 +81,9 @@ class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
     role = serializers.SlugRelatedField(slug_field="code", queryset=Role.objects.all(), default=default_profile_role)
     phone_number = serializers.CharField(required=False, allow_blank=True)
+    organization = serializers.CharField(required=False, allow_blank=True)
+    farm_location = serializers.CharField(required=False, allow_blank=True)
+    farm_group = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = User
@@ -84,6 +95,9 @@ class RegisterSerializer(serializers.ModelSerializer):
             "last_name",
             "role",
             "phone_number",
+            "organization",
+            "farm_location",
+            "farm_group",
         ]
 
     def validate_email(self, value):
@@ -103,6 +117,9 @@ class RegisterSerializer(serializers.ModelSerializer):
         profile_data = {
             "role": validated_data.pop("role", Profile.Role.FARMER),
             "phone_number": validated_data.pop("phone_number", ""),
+            "organization": validated_data.pop("organization", ""),
+            "farm_location": validated_data.pop("farm_location", ""),
+            "farm_group": validated_data.pop("farm_group", ""),
         }
         password = validated_data.pop("password")
         user = User(**validated_data)
@@ -178,53 +195,28 @@ class ResendEmailVerificationSerializer(serializers.Serializer):
         return value
 
 
-class PasswordResetRequestSerializer(serializers.Serializer):
+class MobileLoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
-
-    def validate_email(self, value):
-        self.context["user"] = User.objects.filter(email__iexact=value).first()
-        return value
-
-
-class PasswordResetConfirmSerializer(serializers.Serializer):
-    token = serializers.CharField()
-    password = serializers.CharField(write_only=True, min_length=8)
-
-    def validate_token(self, value):
-        reset_token = PasswordResetToken.objects.select_related("user").filter(token=value).first()
-        if reset_token is None or reset_token.is_used or reset_token.is_expired:
-            raise serializers.ValidationError("Token is invalid or expired.")
-        self.context["reset_token"] = reset_token
-        return value
-
-    def validate_password(self, value):
-        validate_password(value)
-        return value
-
-    @transaction.atomic
-    def save(self, **kwargs):
-        reset_token = self.context["reset_token"]
-        reset_token.user.set_password(self.validated_data["password"])
-        reset_token.user.save(update_fields=["password"])
-        reset_token.mark_used()
-        return reset_token.user
-
-
-class AccountDeletionSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
-    confirmation = serializers.CharField()
 
-    CONFIRMATION_MESSAGE = "DELETE MY ACCOUNT"
+    def validate(self, attrs):
+        email = attrs["email"].strip()
+        password = attrs["password"]
+        user = User.objects.filter(email__iexact=email).select_related("profile").first()
 
-    def validate_password(self, value):
-        user = self.context["request"].user
-        if not user.check_password(value):
-            raise serializers.ValidationError("Password is incorrect.")
-        return value
+        if user is None or not user.check_password(password):
+            raise AuthenticationFailed("Email address or password is incorrect.")
+        profile, _created = Profile.objects.get_or_create(user=user)
+        if profile.role != Profile.Role.MARKET_OFFICER:
+            raise AuthenticationFailed("Mobile access is available for market officers only.")
+        if not user.is_active:
+            raise AuthenticationFailed("This account is inactive.")
 
-    def validate_confirmation(self, value):
-        if value != self.CONFIRMATION_MESSAGE:
-            raise serializers.ValidationError(
-                f'Confirmation must exactly match "{self.CONFIRMATION_MESSAGE}".'
-            )
-        return value
+        refresh = AuthTokenObtainPairSerializer.get_token(user)
+        access = refresh.access_token
+
+        return {
+            "access": str(access),
+            "refresh": str(refresh),
+            "user": UserSerializer(user).data,
+        }

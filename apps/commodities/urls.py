@@ -7,6 +7,9 @@ from .views import (
     CommodityListCreateView,
     CommodityUnitDetailView,
     CommodityUnitListCreateView,
+    MarketListView,
+    MarketPriceRecordDetailView,
+    MarketPriceRecordListCreateView,
 )
 
 app_name = "commodities"
@@ -18,4 +21,11 @@ urlpatterns = [
     path("commodities/units/<str:unit_id>", CommodityUnitDetailView.as_view(), name="unit-detail"),
     path("commodities", CommodityListCreateView.as_view(), name="commodity-list"),
     path("commodities/<str:commodity_id>", CommodityDetailView.as_view(), name="commodity-detail"),
+    path("categories/", CommodityCategoryListCreateView.as_view(), name="category-list"),
+    path("categories/<str:category_id>/", CommodityCategoryDetailView.as_view(), name="category-detail"),
+    path("markets/", MarketListView.as_view(), name="market-list"),
+    path("market-records/", MarketPriceRecordListCreateView.as_view(), name="market-record-list"),
+    path("market-records/<str:record_id>/", MarketPriceRecordDetailView.as_view(), name="market-record-detail"),
+    path("", CommodityListCreateView.as_view(), name="commodity-list"),
+    path("<str:commodity_id>/", CommodityDetailView.as_view(), name="commodity-detail"),
 ]
