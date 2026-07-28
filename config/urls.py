@@ -56,5 +56,6 @@ urlpatterns = [
     path("api/v1/", include("apps.areas.urls")),
     path("api/v1/", include("apps.listings.urls")),
     path("api/v1/", include("apps.orders.urls")),
-    path("ussd/", include("apps.ussd.urls")),
+    path("api/v1/ussd/", include(("apps.ussd.urls", "ussd"), namespace="ussd-api")),
+    path("ussd/", include(("apps.ussd.urls", "ussd"), namespace="ussd")),
 ]
