@@ -90,17 +90,11 @@ class CommodityApiTests(APITestCase):
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)
         self.assertTrue(any(x["unit_id"] == unit_id for x in list_response.data["data"]))
 
-    def test_authenticated_user_can_list_and_get_commodities(self):
-        user = get_user_model().objects.create_user(
-            username="farmer",
-            email="farmer@example.com",
-            password="StrongPass123",
-        )
-        Profile.objects.create(user=user, role=Role.objects.get(code=Profile.Role.FARMER))
+    def test_public_user_can_list_and_get_commodities(self):
         category = CommodityCategory.objects.create(name="Vegetables")
         commodity = Commodity.objects.create(name="Tomato", unit="crate")
         commodity.categories.add(category)
-        self.client.force_authenticate(user)
+        self.client.force_authenticate(user=None)
 
         list_response = self.client.get("/api/v1/commodities")
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)

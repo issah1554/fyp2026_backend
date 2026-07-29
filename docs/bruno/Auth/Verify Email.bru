@@ -16,6 +16,11 @@ headers {
 
 body:json {
   {
-    "token": "{{email_verification_token}}"
+    "email": "{{user_email}}",
+    "code": "{{email_verification_code}}"
   }
+}
+
+vars:pre-request {
+  email_verification_code: 123456
 }

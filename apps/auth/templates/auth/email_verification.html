@@ -24,19 +24,14 @@
                 <p style="margin:0 0 24px; font-size:16px; line-height:24px; color:#43524e;">
                   Confirm your email address to finish setting up your Smart Market account.
                 </p>
-                <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 24px;">
-                  <tr>
-                    <td style="background:#0f5f4a; border-radius:6px;">
-                      <a href="{{ verification_url }}" style="display:inline-block; padding:13px 20px; color:#ffffff; font-size:15px; line-height:20px; font-weight:700; text-decoration:none;">Verify email</a>
-                    </td>
-                  </tr>
-                </table>
+                <div style="margin:0 0 24px; padding:18px 20px; border:1px solid #c8d8d2; border-radius:8px; background:#f8fbfa; text-align:center; font-size:32px; line-height:40px; letter-spacing:6px; font-weight:700; color:#0f5f4a;">
+                  {{ verification_code }}
+                </div>
                 <p style="margin:0 0 12px; font-size:14px; line-height:22px; color:#5c6b67;">
-                  This verification link expires in {{ expires_in_hours }} hours.
+                  This verification code expires in {{ expires_in_hours }} hours.
                 </p>
                 <p style="margin:0; font-size:14px; line-height:22px; color:#5c6b67;">
-                  If the button does not work, open this link in your browser:<br>
-                  <a href="{{ verification_url }}" style="color:#0f5f4a; word-break:break-all;">{{ verification_url }}</a>
+                  Enter this code in the Smart Market app to verify your email address.
                 </p>
               </td>
             </tr>

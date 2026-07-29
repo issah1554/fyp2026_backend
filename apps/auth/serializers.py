@@ -165,18 +165,22 @@ class AuthTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 
 class VerifyEmailSerializer(serializers.Serializer):
-    token = serializers.CharField()
+    email = serializers.EmailField()
+    code = serializers.RegexField(
+        regex=r"^\d{6}$",
+        error_messages={"invalid": "Enter a valid 6-digit verification code."},
+    )
 
-    def validate_token(self, value):
+    def validate(self, attrs):
         verification_token = (
             EmailVerificationToken.objects.select_related("user", "user__profile")
-            .filter(token=value)
+            .filter(user__email__iexact=attrs["email"], token=attrs["code"])
             .first()
         )
         if verification_token is None or verification_token.is_used or verification_token.is_expired:
-            raise serializers.ValidationError("Token is invalid or expired.")
+            raise serializers.ValidationError({"code": ["Verification code is invalid or expired."]})
         self.context["verification_token"] = verification_token
-        return value
+        return attrs
 
     @transaction.atomic
     def save(self, **kwargs):
