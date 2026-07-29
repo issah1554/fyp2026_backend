@@ -165,6 +165,7 @@ class Command(BaseCommand):
                     },
                 )
                 defaults = {
+                    "pricetype": MarketCommodityPrice.PriceType.WHOLESALE,
                     "price": self._representative_price(min_price, max_price),
                     "min_price": min_price,
                     "max_price": max_price,

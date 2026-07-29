@@ -86,6 +86,7 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
             "market_id",
             "commodity",
             "commodity_id",
+            "pricetype",
             "price",
             "min_price",
             "max_price",
@@ -128,11 +129,13 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
         market = self.fixed_market or attrs.get("market_id") or getattr(self.instance, "market", None)
         commodity = attrs.get("commodity_id") or getattr(self.instance, "commodity", None)
         price_date = attrs.get("price_date") or getattr(self.instance, "price_date", None)
+        pricetype = attrs.get("pricetype", getattr(self.instance, "pricetype", None))
         if market and commodity and price_date:
             queryset = MarketCommodityPrice.all_objects.filter(
                 market=market,
                 commodity=commodity,
                 price_date=price_date,
+                pricetype=pricetype,
                 deleted_at__isnull=True,
             )
             if self.instance:

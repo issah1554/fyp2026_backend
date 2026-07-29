@@ -1,11 +1,37 @@
 from decimal import Decimal, InvalidOperation
 
+from django.contrib.auth import get_user_model
 from django.http import HttpResponse
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
+from apps.auth.models import Profile
+from apps.users.models import Role
+
+from .forecasting import (
+    ForecastUnavailable,
+    PERIOD_MAP as FORECAST_PERIOD_MAP,
+    PRICE_TYPE_MAP,
+    calendar_week_end_date,
+    get_forecast_service,
+    season_end_date,
+)
 from .models import UssdPriceAlert, UssdSubscriber
+from .prediction_cache import get_cached_prediction
+from .recommendations import get_cached_recommendation
+from .market_prices_api import (
+    LiveMarketPricesUnavailable,
+    get_market_price_service,
+)
+from .weather import (
+    WeatherForecastUnavailable,
+    get_weather_region_options,
+    get_weather_service,
+)
+
+User = get_user_model()
 
 
 ROLE_MAP = {
@@ -19,33 +45,24 @@ COMMODITY_MAP = {
     "2": ("rice", "Rice"),
 }
 
-MARKET_PRICE_DATA = {
-    ("1", "1"): "END Maize at Ifakara Central: Current TZS 820/kg, Yesterday TZS 790/kg, Trend: Rising.",
-    ("1", "2"): "END Maize in Nearby Markets: Current TZS 780/kg, Yesterday TZS 800/kg, Trend: Slightly Down.",
-    ("2", "1"): "END Rice at Ifakara Central: Current TZS 2,150/kg, Yesterday TZS 2,120/kg, Trend: Rising.",
-    ("2", "2"): "END Rice in Nearby Markets: Current TZS 2,080/kg, Yesterday TZS 2,060/kg, Trend: Stable Upward.",
-}
-
-PREDICTION_DATA = {
-    ("1", "1"): "END Maize next 7 days: TZS 830-880/kg, Trend: Upward, Confidence: 84%.",
-    ("1", "2"): "END Rice next 7 days: TZS 2,120-2,220/kg, Trend: Stable Upward, Confidence: 81%.",
-    ("2", "1"): "END Maize next month: TZS 860-940/kg, Trend: Upward, Confidence: 78%.",
-    ("2", "2"): "END Rice next month: TZS 2,180-2,320/kg, Trend: Upward, Confidence: 76%.",
-    ("3", "1"): "END Maize next season: TZS 900-1,020/kg, Trend: Seasonal Rise, Confidence: 72%.",
-    ("3", "2"): "END Rice next season: TZS 2,240-2,420/kg, Trend: Moderate Rise, Confidence: 70%.",
-}
-
-RECOMMENDATION_DATA = {
-    ("1", "1"): "END Recommendation: Wait. Reason: Maize trend is still rising, supply is tightening, seasonal demand is improving. Confidence: 86%.",
-    ("1", "2"): "END Recommendation: Sell at Ifakara Central. Reason: Better maize demand, lower supply pressure, and stronger price momentum. Confidence: 82%.",
-    ("2", "1"): "END Recommendation: Sell Now. Reason: Rice prices are already favorable, supply is expected to improve soon, and seasonal gains may soften. Confidence: 80%.",
-    ("2", "2"): "END Recommendation: Sell at Nearby Markets. Reason: Rice has stronger buyer activity there, steady turnover, and reduced transport pressure. Confidence: 77%.",
-}
-
-
 @method_decorator(csrf_exempt, name="dispatch")
 class UssdMenuView(View):
     http_method_names = ["get", "post"]
+
+    def _resolve_profile_role(self, role_code):
+        try:
+            role_label = Profile.Role(role_code).label
+        except ValueError:
+            role_label = role_code.replace("_", " ").title()
+        role, _created = Role.objects.get_or_create(
+            code=role_code,
+            defaults={
+                "name": role_label,
+                "description": f"{role_label} role.",
+                "is_system": True,
+            },
+        )
+        return role
 
     def _get_value(self, request, key):
         return (
@@ -59,6 +76,8 @@ class UssdMenuView(View):
     def _normalize_segments(self, text):
         if not text:
             return []
+        if text.strip() == "0":
+            return ["0"]
 
         normalized = []
         for segment in text.split("*"):
@@ -78,12 +97,93 @@ class UssdMenuView(View):
             "1. Market Prices\n"
             "2. Price Prediction\n"
             "3. My Recommendations\n"
-            "4. My Account\n"
+            "4. Weather Forecast\n"
+            "5. My Account\n"
             "0. Exit"
         )
 
     def _is_exit(self, segments):
         return segments == ["0"]
+
+    def _strip_completed_registration_segments(self, subscriber, segments):
+        if len(segments) < 3:
+            return segments
+        selected_role = ROLE_MAP.get(segments[1])
+        if segments[0] == subscriber.full_name and selected_role == subscriber.role:
+            return segments[2:]
+        return segments
+
+    def _forecast_market_options(self):
+        return get_forecast_service().get_market_options()
+
+    def _forecast_commodity_options(self):
+        return get_forecast_service().get_commodity_options()
+
+    def _recommendation_prompt_lines(self, subscriber):
+        if subscriber.role == UssdSubscriber.Role.BUYER:
+            return (
+                "CON Select need\n"
+                "1. Best Time to Buy\n"
+                "2. Best Market to Buy\n"
+                "0. Back"
+            )
+        return (
+            "CON Select need\n"
+            "1. Best Time to Sell\n"
+            "2. Best Market to Sell\n"
+            "0. Back"
+        )
+
+    def _recommendation_window_end(self, recommendation):
+        import pandas as pd
+
+        target = pd.Timestamp(recommendation.target_date).normalize()
+        if recommendation.period == "daily":
+            return recommendation.target_date.isoformat()
+        if recommendation.period == "weekly":
+            return calendar_week_end_date(target).date().isoformat()
+        if recommendation.period == "monthly":
+            return (target + pd.offsets.MonthEnd(0)).date().isoformat()
+        if recommendation.period == "seasonal":
+            return season_end_date(target).date().isoformat()
+        return recommendation.target_date.isoformat()
+
+    def _split_name(self, full_name):
+        name_parts = full_name.split()
+        if not name_parts:
+            return "USSD", "User"
+        first_name = name_parts[0]
+        last_name = " ".join(name_parts[1:])
+        return first_name, last_name
+
+    def _sync_backend_profile(self, phone_number, full_name, role):
+        profile = Profile.objects.select_related("user").filter(phone_number=phone_number).first()
+        first_name, last_name = self._split_name(full_name)
+        profile_role = self._resolve_profile_role(role)
+
+        if profile is None:
+            user = User(username=phone_number, first_name=first_name, last_name=last_name)
+            user.set_unusable_password()
+            user.save()
+            profile = Profile.objects.create(
+                user=user,
+                role=profile_role,
+                phone_number=phone_number,
+                email_verified_at=timezone.now(),
+            )
+            return user, profile
+
+        user = profile.user
+        user.username = phone_number
+        user.first_name = first_name
+        user.last_name = last_name
+        user.save(update_fields=["username", "first_name", "last_name"])
+
+        update_fields = ["role", "phone_number", "updated_at"]
+        profile.role = profile_role
+        profile.phone_number = phone_number
+        profile.save(update_fields=update_fields)
+        return user, profile
 
     def _handle_registration(self, phone_number, segments):
         if not segments:
@@ -103,94 +203,386 @@ class UssdMenuView(View):
         if role is None:
             return "END Invalid role selection."
 
+        user, _profile = self._sync_backend_profile(phone_number or "unknown", full_name, role)
         UssdSubscriber.objects.update_or_create(
             phone_number=phone_number or "unknown",
-            defaults={"full_name": full_name, "role": role},
+            defaults={"user": user, "full_name": full_name, "role": role},
         )
         return self._main_menu()
 
     def _handle_market_prices(self, segments):
+        service = get_market_price_service()
         if len(segments) == 1:
-            return "CON Select commodity\n1. Maize\n2. Rice\n0. Back"
+            try:
+                market_lines = [f"{option}. {item['name']}" for option, item in service.get_market_options()]
+            except LiveMarketPricesUnavailable:
+                return "END Market prices not available right now."
+            return "CON Select market\n" + "\n".join(market_lines) + "\n0. Back"
         if len(segments) == 2:
-            if segments[1] not in COMMODITY_MAP:
-                return "END Invalid commodity selection."
-            return "CON Select market\n1. Ifakara Central\n2. Nearby Markets\n0. Back"
+            try:
+                market_lookup = dict(service.get_market_options())
+                selected_market = market_lookup.get(segments[1])
+                if selected_market is None:
+                    return "END Invalid market selection."
+                commodity_lines = [
+                    f"{option}. {item['name']}"
+                    for option, item in service.get_commodity_options(selected_market["market_id"])
+                ]
+            except LiveMarketPricesUnavailable:
+                return "END Market prices not available right now."
+            if not commodity_lines:
+                return "END No commodities available for this market right now."
+            return "CON Select commodity\n" + "\n".join(commodity_lines) + "\n0. Back"
         if len(segments) == 3:
-            return MARKET_PRICE_DATA.get(
-                (segments[1], segments[2]),
-                "END Invalid market selection.",
+            try:
+                market_lookup = dict(service.get_market_options())
+                selected_market = market_lookup.get(segments[1])
+                if selected_market is None:
+                    return "END Invalid market selection."
+                commodity_lookup = dict(service.get_commodity_options(selected_market["market_id"]))
+                selected_commodity = commodity_lookup.get(segments[2])
+                if selected_commodity is None:
+                    return "END Invalid commodity selection."
+                price_type_lines = [
+                    f"{option}. {item['label']}"
+                    for option, item in service.get_price_type_options(
+                        selected_market["market_id"],
+                        selected_commodity["commodity_id"],
+                    )
+                ]
+            except LiveMarketPricesUnavailable:
+                return "END Market prices not available right now."
+            if not price_type_lines:
+                return "END No price types available for this commodity right now."
+            return "CON Select price type\n" + "\n".join(price_type_lines) + "\n0. Back"
+        if len(segments) == 4:
+            try:
+                market_lookup = dict(service.get_market_options())
+                selected_market = market_lookup.get(segments[1])
+                if selected_market is None:
+                    return "END Invalid market selection."
+                commodity_lookup = dict(service.get_commodity_options(selected_market["market_id"]))
+                selected_commodity = commodity_lookup.get(segments[2])
+                if selected_commodity is None:
+                    return "END Invalid commodity selection."
+                price_type_lookup = dict(
+                    service.get_price_type_options(
+                        selected_market["market_id"],
+                        selected_commodity["commodity_id"],
+                    )
+                )
+                selected_price_type = price_type_lookup.get(segments[3])
+                if selected_price_type is None:
+                    return "END Invalid price type."
+                price_data = service.get_market_price(
+                    selected_market["market_id"],
+                    selected_commodity["commodity_id"],
+                    selected_price_type["value"],
+                )
+            except LiveMarketPricesUnavailable:
+                return "END Market prices not available right now."
+            min_price = (
+                f"{price_data['currency']} {Decimal(price_data['min_price']):,.2f}"
+                if price_data.get("min_price") is not None
+                else "Not available"
+            )
+            max_price = (
+                f"{price_data['currency']} {Decimal(price_data['max_price']):,.2f}"
+                if price_data.get("max_price") is not None
+                else "Not available"
+            )
+            current_price = (
+                f"{price_data['currency']} {Decimal(price_data['price']):,.2f}"
+                if price_data.get("price") is not None
+                else "Not available"
+            )
+            return (
+                "END Market Price\n"
+                f"Market: {price_data['market']}\n"
+                f"Commodity: {price_data['commodity']}\n"
+                f"Type: {price_data['pricetype']}\n"
+                f"Date: {price_data['price_date']}\n"
+                f"Current Price: {current_price}\n"
+                f"Min Price: {min_price}\n"
+                f"Max Price: {max_price}"
             )
         return "END Invalid choice."
 
     def _handle_prediction(self, segments):
         if len(segments) == 1:
+            market_lines = [f"{option}. {name}" for option, name in self._forecast_market_options()]
             return (
-                "CON Select time period\n"
-                "1. Next 7 Days\n"
-                "2. Next Month\n"
-                "3. Next Season\n"
+                "CON Select market\n"
+                + "\n".join(market_lines)
+                + "\n0. Back"
+            )
+        if len(segments) == 2:
+            market_lookup = dict(self._forecast_market_options())
+            if segments[1] not in market_lookup:
+                return "END Invalid market selection."
+            commodity_lines = [f"{option}. {name}" for option, name in self._forecast_commodity_options()]
+            return (
+                "CON Select commodity\n"
+                + "\n".join(commodity_lines)
+                + "\n0. Back"
+            )
+        if len(segments) == 3:
+            if segments[2] not in dict(self._forecast_commodity_options()):
+                return "END Invalid commodity selection."
+            return "CON Select price type\n1. Retail\n2. Wholesale\n0. Back"
+        if len(segments) == 4:
+            if segments[3] not in PRICE_TYPE_MAP:
+                return "END Invalid price type."
+            return (
+                "CON Select period\n"
+                "1. Daily\n"
+                "2. Weekly\n"
+                "3. Monthly\n"
+                "4. Seasonal\n"
                 "0. Back"
             )
-        if len(segments) == 2:
-            if segments[1] not in {"1", "2", "3"}:
-                return "END Invalid time period."
-            return "CON Select commodity\n1. Maize\n2. Rice\n0. Back"
-        if len(segments) == 3:
-            return PREDICTION_DATA.get(
-                (segments[1], segments[2]),
-                "END Invalid commodity selection.",
-            )
-        return "END Invalid choice."
-
-    def _handle_recommendations(self, segments):
-        if len(segments) == 1:
-            return "CON Select commodity\n1. Maize\n2. Rice\n0. Back"
-        if len(segments) == 2:
-            if segments[1] not in COMMODITY_MAP:
+        if len(segments) == 5:
+            market = dict(self._forecast_market_options()).get(segments[1])
+            commodity = dict(self._forecast_commodity_options()).get(segments[2])
+            price_type = PRICE_TYPE_MAP.get(segments[3])
+            period = FORECAST_PERIOD_MAP.get(segments[4])
+            if market is None:
+                return "END Invalid market selection."
+            if commodity is None:
                 return "END Invalid commodity selection."
-            return "CON Select need\n1. Best Time to Sell\n2. Best Market to Sell\n0. Back"
-        if len(segments) == 3:
-            return RECOMMENDATION_DATA.get(
-                (segments[1], segments[2]),
-                "END Invalid recommendation option.",
+            if price_type is None:
+                return "END Invalid price type."
+            if period is None:
+                return "END Invalid period selection."
+
+            try:
+                result = get_cached_prediction(
+                    market=market,
+                    commodity=commodity,
+                    pricetype=price_type[0],
+                    period=period,
+                )
+            except ForecastUnavailable:
+                return "END Prediction not available right now."
+
+            period_label = {
+                "daily": f"Day: {result.target_date.isoformat()}",
+                "weekly": f"Week: {result.target_date.isoformat()} to {result.period_end.isoformat()}",
+                "monthly": f"Month: {result.target_date.isoformat()} to {result.period_end.isoformat()}",
+                "seasonal": (
+                    f"Season: {result.season} "
+                    f"({result.target_date.isoformat()} to {result.period_end.isoformat()})"
+                ),
+            }[result.period]
+            return (
+                "END Predicted Price\n"
+                f"Market: {result.market.name}\n"
+                f"Commodity: {result.commodity}\n"
+                f"Type: {result.pricetype} ({result.unit})\n"
+                f"{period_label}\n"
+                f"Price: {result.currency} {result.predicted_price:,.2f}"
             )
         return "END Invalid choice."
 
-    def _handle_account(self, subscriber, segments):
+    def _handle_recommendations(self, subscriber, segments):
         if len(segments) == 1:
+            commodity_lines = [f"{option}. {name}" for option, name in self._forecast_commodity_options()]
+            return (
+                "CON Select commodity\n"
+                + "\n".join(commodity_lines)
+                + "\n0. Back"
+            )
+        if len(segments) == 2:
+            if segments[1] not in dict(self._forecast_commodity_options()):
+                return "END Invalid commodity selection."
+            return self._recommendation_prompt_lines(subscriber)
+        if len(segments) == 3:
+            commodity = dict(self._forecast_commodity_options()).get(segments[1])
+            recommendation_type = {
+                "1": "time",
+                "2": "market",
+            }.get(segments[2])
+            if commodity is None:
+                return "END Invalid commodity selection."
+            if recommendation_type is None:
+                return "END Invalid recommendation option."
+
+            try:
+                recommendation = get_cached_recommendation(
+                    role=subscriber.role,
+                    commodity=commodity,
+                    recommendation_type=recommendation_type,
+                )
+            except LookupError:
+                return "END Recommendation not available right now."
+
+            if recommendation.recommendation_type == "time":
+                period_label = {
+                    "daily": "today",
+                    "weekly": "week",
+                    "monthly": "month",
+                    "seasonal": "season",
+                }.get(recommendation.period, recommendation.period)
+                return (
+                    "END Recommendation\n"
+                    f"{recommendation.summary}\n"
+                    f"Window: {period_label}\n"
+                    f"Season: {recommendation.season}\n"
+                    f"Trend: {recommendation.trend}\n"
+                    f"Reason: {recommendation.reason}"
+                )
+            return (
+                "END Recommendation\n"
+                f"{recommendation.summary}\n"
+                f"Trend: {recommendation.trend}\n"
+                f"Reason: {recommendation.reason}"
+            )
+        return "END Invalid choice."
+
+    def _handle_weather_forecast(self, segments):
+        region_options = get_weather_region_options()
+        if len(segments) == 1:
+            region_lines = [f"{option}. {region.name}" for option, region in region_options]
+            return "CON Select region\n" + "\n".join(region_lines) + "\n0. Back"
+
+        if len(segments) == 2:
+            region = dict(region_options).get(segments[1])
+            if region is None:
+                return "END Invalid region selection."
+            try:
+                forecast = get_weather_service().fetch_weekly_forecast(region)
+            except WeatherForecastUnavailable:
+                return "END Weather forecast not available right now."
+
+            day_lines = [
+                (
+                    f"{day['weekday']}: {day['condition']}, "
+                    f"{day['guidance']}, {day['temperature']}"
+                )
+                for day in forecast["days"]
+            ]
+            return (
+                "END Weather Forecast\n"
+                f"Region: {forecast['region']}\n"
+                f"Season: {forecast['season']}\n"
+                + "\n".join(day_lines)
+            )
+        return "END Invalid choice."
+
+    def _profile_for_subscriber(self, subscriber):
+        profile_role = self._resolve_profile_role(subscriber.role)
+        if subscriber.user_id:
+            profile, _created = Profile.objects.get_or_create(
+                user=subscriber.user,
+                defaults={
+                    "role": profile_role,
+                    "phone_number": subscriber.phone_number,
+                },
+            )
+            profile_needs_update = False
+            if profile.role_id != profile_role.id:
+                profile.role = profile_role
+                profile_needs_update = True
+            if not profile.phone_number:
+                profile.phone_number = subscriber.phone_number
+                profile_needs_update = True
+            if profile_needs_update:
+                profile.save(update_fields=["role", "phone_number", "updated_at"])
+            return profile
+
+        user, profile = self._sync_backend_profile(
+            subscriber.phone_number,
+            subscriber.full_name,
+            subscriber.role,
+        )
+        subscriber.user = user
+        subscriber.save(update_fields=["user"])
+        return profile
+
+    def _account_menu(self, subscriber):
+        if subscriber.role == UssdSubscriber.Role.FARMER:
             return (
                 "CON My Account\n"
                 "1. View Profile\n"
                 "2. Change Role\n"
                 "3. Set Price Alert\n"
+                "4. Update Farm Location\n"
+                "5. Update Farm Group\n"
                 "0. Back"
             )
+        return (
+            "CON My Account\n"
+            "1. View Profile\n"
+            "2. Change Role\n"
+            "3. Set Price Alert\n"
+            "0. Back"
+        )
+
+    def _view_profile_response(self, subscriber, profile):
+        saved_alerts = {
+            alert.commodity: alert.target_price
+            for alert in subscriber.price_alerts.filter(is_active=True)
+        }
+        maize_alert = saved_alerts.get(UssdPriceAlert.Commodity.MAIZE)
+        rice_alert = saved_alerts.get(UssdPriceAlert.Commodity.RICE)
+        message = (
+            f"END Name: {subscriber.full_name}, Role: {subscriber.get_role_display()}, "
+            f"Phone: {subscriber.phone_number}"
+        )
+        if subscriber.role == UssdSubscriber.Role.FARMER:
+            farm_location = profile.farm_location or "Not set"
+            farm_group = profile.farm_group or "Not set"
+            message += f", Farm Location: {farm_location}, Farm Group: {farm_group}"
+        maize_alert_text = f"TZS {maize_alert:.2f}" if maize_alert is not None else "Not set"
+        rice_alert_text = f"TZS {rice_alert:.2f}" if rice_alert is not None else "Not set"
+        message += f", Maize Alert: {maize_alert_text}, Rice Alert: {rice_alert_text}"
+        return message
+
+    def _handle_account(self, subscriber, segments):
+        profile = self._profile_for_subscriber(subscriber)
+
+        if len(segments) == 1:
+            return self._account_menu(subscriber)
+
         if len(segments) == 2:
             if segments[1] == "1":
-                return (
-                    f"END Name: {subscriber.full_name}, Role: {subscriber.get_role_display()}, "
-                    f"Phone: {subscriber.phone_number}"
-                )
+                return self._view_profile_response(subscriber, profile)
             if segments[1] == "2":
                 return "CON Change role\n1. Farmer\n2. Entrepreneur\n3. Buyer\n0. Back"
             if segments[1] == "3":
                 return "CON Select commodity alert\n1. Maize\n2. Rice\n0. Back"
+            if segments[1] == "4" and subscriber.role == UssdSubscriber.Role.FARMER:
+                return "CON Enter farm location"
+            if segments[1] == "5" and subscriber.role == UssdSubscriber.Role.FARMER:
+                return "CON Enter farm group"
             return "END Invalid account option."
+
         if len(segments) == 3:
             if segments[1] == "2":
                 role = ROLE_MAP.get(segments[2])
                 if role is None:
                     return "END Invalid role selection."
+                profile_role = self._resolve_profile_role(role)
                 subscriber.role = role
                 subscriber.save(update_fields=["role", "updated_at"])
+                profile.role = profile_role
+                profile.save(update_fields=["role", "updated_at"])
                 return f"END Role updated to {subscriber.get_role_display()}."
             if segments[1] == "3":
                 if segments[2] not in COMMODITY_MAP:
                     return "END Invalid commodity selection."
                 commodity_name = COMMODITY_MAP[segments[2]][1]
                 return f"CON Enter target price for {commodity_name}"
+            if segments[1] == "4" and subscriber.role == UssdSubscriber.Role.FARMER:
+                profile.farm_location = segments[2]
+                profile.save(update_fields=["farm_location", "updated_at"])
+                return f"END Farm location updated to {profile.farm_location}."
+            if segments[1] == "5" and subscriber.role == UssdSubscriber.Role.FARMER:
+                profile.farm_group = segments[2]
+                profile.save(update_fields=["farm_group", "updated_at"])
+                return f"END Farm group updated to {profile.farm_group}."
             return "END Invalid account option."
+
         if len(segments) == 4 and segments[1] == "3":
             commodity = COMMODITY_MAP.get(segments[2])
             if commodity is None:
@@ -219,7 +611,9 @@ class UssdMenuView(View):
         _ = session_id, service_code, phone_number
         raw_segments = [segment.strip() for segment in text.split("*") if segment.strip()]
         segments = self._normalize_segments(text)
-        subscriber = UssdSubscriber.objects.filter(phone_number=phone_number).first()
+        subscriber = UssdSubscriber.objects.select_related("user").filter(phone_number=phone_number).first()
+        if subscriber is not None:
+            segments = self._strip_completed_registration_segments(subscriber, segments)
 
         if self._is_exit(raw_segments):
             response_text = "END Thank you for using SmartMarket DSS. Asante! Kwa heri."
@@ -232,8 +626,10 @@ class UssdMenuView(View):
         elif segments[0] == "2":
             response_text = self._handle_prediction(segments)
         elif segments[0] == "3":
-            response_text = self._handle_recommendations(segments)
+            response_text = self._handle_recommendations(subscriber, segments)
         elif segments[0] == "4":
+            response_text = self._handle_weather_forecast(segments)
+        elif segments[0] == "5":
             response_text = self._handle_account(subscriber, segments)
         else:
             response_text = "END Invalid choice. Please try again."

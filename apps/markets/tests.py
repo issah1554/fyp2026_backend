@@ -42,6 +42,7 @@ class MarketCommodityPriceUniquenessTests(TestCase):
         values = {
             "market": self.market,
             "commodity": self.commodity,
+            "pricetype": MarketCommodityPrice.PriceType.RETAIL,
             "price": Decimal("1000.00"),
             "currency": "UGX",
             "price_date": self.price_date,
@@ -76,6 +77,7 @@ class MarketCommodityPriceUniquenessTests(TestCase):
             {
                 "market_id": self.market.public_id,
                 "commodity_id": self.commodity.public_id,
+                "pricetype": MarketCommodityPrice.PriceType.RETAIL,
                 "price": "1200.00",
                 "currency": "UGX",
                 "price_date": self.price_date.isoformat(),
@@ -85,6 +87,16 @@ class MarketCommodityPriceUniquenessTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("already exists", str(response.data))
+
+    def test_database_allows_different_price_types_for_same_market_commodity_and_date(self):
+        self.create_price(pricetype=MarketCommodityPrice.PriceType.RETAIL)
+
+        wholesale_price = self.create_price(
+            pricetype=MarketCommodityPrice.PriceType.WHOLESALE,
+            price=Decimal("1200.00"),
+        )
+
+        self.assertEqual(wholesale_price.pricetype, MarketCommodityPrice.PriceType.WHOLESALE)
 
     def test_api_rejects_update_to_existing_market_commodity_date_combination(self):
         existing_price = self.create_price()
@@ -98,6 +110,7 @@ class MarketCommodityPriceUniquenessTests(TestCase):
             {
                 "market_id": existing_price.market.public_id,
                 "commodity_id": existing_price.commodity.public_id,
+                "pricetype": existing_price.pricetype,
                 "price_date": existing_price.price_date.isoformat(),
             },
             format="json",

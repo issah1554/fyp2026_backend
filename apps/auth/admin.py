@@ -5,8 +5,26 @@ from .models import EmailVerificationToken, Profile
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ("public_id", "user", "role", "phone_number", "organization", "email_verified_at", "created_at")
-    search_fields = ("public_id", "user__username", "user__email", "phone_number", "organization")
+    list_display = (
+        "public_id",
+        "user",
+        "role",
+        "phone_number",
+        "organization",
+        "farm_location",
+        "farm_group",
+        "email_verified_at",
+        "created_at",
+    )
+    search_fields = (
+        "public_id",
+        "user__username",
+        "user__email",
+        "phone_number",
+        "organization",
+        "farm_location",
+        "farm_group",
+    )
     list_filter = ("role", "email_verified_at")
     readonly_fields = ("public_id",)
 
