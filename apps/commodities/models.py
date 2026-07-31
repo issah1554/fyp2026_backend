@@ -30,7 +30,6 @@ class CommodityUnit(models.Model):
     public_id = models.CharField(max_length=10, unique=True, editable=False)
     name = models.CharField(max_length=150, unique=True)
     symbol = models.CharField(max_length=30, unique=True)
-    description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -41,39 +40,23 @@ class CommodityUnit(models.Model):
     def save(self, *args, **kwargs):
         if not self.public_id:
             self.public_id = generate_unique_public_id(CommodityUnit)
-class Market(models.Model):
-    public_id = models.CharField(max_length=10, unique=True, editable=False)
-    name = models.CharField(max_length=150, unique=True)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["name"]
-
-    def save(self, *args, **kwargs):
-        if not self.public_id:
-            self.public_id = generate_unique_public_id(Market)
             if kwargs.get("update_fields") is not None:
                 kwargs["update_fields"] = set(kwargs["update_fields"]) | {"public_id"}
         super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.name} ({self.symbol})"
-        return self.name
 
 
 class Commodity(models.Model):
     public_id = models.CharField(max_length=10, unique=True, editable=False)
     name = models.CharField(max_length=150)
-    unit = models.CharField(max_length=50, blank=True)
-    unit_ref = models.ForeignKey(
+    units = models.ManyToManyField(
         CommodityUnit,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
+        through="CommodityUnitMap",
         related_name="commodities",
+        blank=True,
     )
-    description = models.TextField(blank=True)
     categories = models.ManyToManyField(
         CommodityCategory,
         through="CommodityCategoryMap",
@@ -116,47 +99,33 @@ class CommodityCategoryMap(models.Model):
         return f"{self.commodity} -> {self.category}"
 
 
-class MarketPriceRecord(models.Model):
-    class PriceType(models.TextChoices):
-        RETAIL = "Retail", "Retail"
-        WHOLESALE = "Wholesale", "Wholesale"
-
-    public_id = models.CharField(max_length=10, unique=True, editable=False)
-    market = models.ForeignKey(
-        Market,
-        on_delete=models.PROTECT,
-        related_name="price_records",
-    )
+class CommodityUnitMap(models.Model):
     commodity = models.ForeignKey(
         Commodity,
-        on_delete=models.PROTECT,
-        related_name="price_records",
+        on_delete=models.CASCADE,
+        related_name="unit_maps",
     )
-    price_type = models.CharField(max_length=32, choices=PriceType.choices)
-    unit = models.CharField(max_length=32)
-    price = models.DecimalField(max_digits=14, decimal_places=2)
-    currency = models.CharField(max_length=16, default="TZS")
-    record_date = models.DateField()
-    notes = models.TextField(blank=True)
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="market_price_records",
+    unit = models.ForeignKey(
+        CommodityUnit,
+        on_delete=models.CASCADE,
+        related_name="commodity_maps",
+    )
+    is_primary = models.BooleanField(
+        default=False,
+        help_text="Marks this as the default display unit for the commodity.",
     )
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["-record_date", "market__name", "commodity__name"]
-
-    def save(self, *args, **kwargs):
-        if not self.public_id:
-            self.public_id = generate_unique_public_id(MarketPriceRecord)
-            if kwargs.get("update_fields") is not None:
-                kwargs["update_fields"] = set(kwargs["update_fields"]) | {"public_id"}
-        super().save(*args, **kwargs)
+        db_table = "commodity_unit_maps"
+        ordering = ["-is_primary", "unit__name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["commodity", "unit"],
+                name="unique_commodity_unit_map",
+            )
+        ]
 
     def __str__(self):
-        return f"{self.market} | {self.commodity} | {self.record_date}"
+        primary_tag = " (primary)" if self.is_primary else ""
+        return f"{self.commodity} -> {self.unit}{primary_tag}"

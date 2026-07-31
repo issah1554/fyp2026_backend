@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from django.utils import timezone
 
-from apps.commodities.models import Market
+from apps.markets.models import Market
 
 from .forecasting import (
     PRICE_TYPE_MAP,

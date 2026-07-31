@@ -30,7 +30,7 @@ class Migration(migrations.Migration):
                 ('summary', models.CharField(max_length=255)),
                 ('reason', models.TextField()),
                 ('generated_at', models.DateTimeField(auto_now=True)),
-                ('market', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='ussd_recommendations', to='commodities.market')),
+                ('market', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='ussd_recommendations', to='markets.market')),
             ],
             options={
                 'ordering': ['role', 'commodity', 'recommendation_type', '-target_date'],

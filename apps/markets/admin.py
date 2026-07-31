@@ -16,7 +16,7 @@ class MarketCommodityPriceAdmin(admin.ModelAdmin):
     list_display = (
         "market",
         "commodity",
-        "pricetype",
+        "price_type",
         "price",
         "min_price",
         "max_price",
@@ -25,6 +25,6 @@ class MarketCommodityPriceAdmin(admin.ModelAdmin):
         "created_at",
         "deleted_at",
     )
-    list_filter = ("pricetype", "currency", "price_date", "market", "commodity")
+    list_filter = ("price_type", "currency", "price_date", "market", "commodity")
     search_fields = ("market__name", "commodity__name")
     readonly_fields = ("public_id", "created_at", "updated_at")

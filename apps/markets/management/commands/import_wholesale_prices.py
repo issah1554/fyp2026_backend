@@ -18,7 +18,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from apps.areas.models import AdmArea
-from apps.commodities.models import Commodity, CommodityUnit
+from apps.commodities.models import Commodity, CommodityUnit, CommodityUnitMap
 from apps.markets.models import Market, MarketCommodityPrice
 
 
@@ -156,16 +156,17 @@ class Command(BaseCommand):
                 if min_price is None and max_price is None:
                     continue
 
-                commodity, _ = Commodity.objects.get_or_create(
+                commodity, created = Commodity.objects.get_or_create(
                     name=english_name,
-                    defaults={
-                        "unit": options["unit"],
-                        "unit_ref": unit,
-                        "description": sw_name,
-                    },
                 )
+                if created and unit:
+                    CommodityUnitMap.objects.get_or_create(
+                        commodity=commodity,
+                        unit=unit,
+                        defaults={"is_primary": True},
+                    )
                 defaults = {
-                    "pricetype": MarketCommodityPrice.PriceType.WHOLESALE,
+                    "price_type": MarketCommodityPrice.PriceType.WHOLESALE,
                     "price": self._representative_price(min_price, max_price),
                     "min_price": min_price,
                     "max_price": max_price,

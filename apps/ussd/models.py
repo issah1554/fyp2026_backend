@@ -2,7 +2,7 @@ from django.conf import settings
 from django.db import models
 
 from apps.common.ids import generate_unique_public_id
-from apps.commodities.models import Market
+from apps.markets.models import Market
 
 
 class UssdSubscriber(models.Model):
