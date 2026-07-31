@@ -98,9 +98,12 @@ class MarketCommodityPrice(models.Model):
         blank=True,
     )
     price = models.DecimalField(max_digits=12, decimal_places=2)
+    price_usd = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     min_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     max_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     currency = models.CharField(max_length=3, default="UGX")
+    source_key = models.CharField(max_length=50, blank=True)
+    source_name = models.CharField(max_length=100, blank=True)
     price_date = models.DateField()
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -127,6 +130,7 @@ class MarketCommodityPrice(models.Model):
         indexes = [
             models.Index(fields=["market", "price_date"], name="mcp_market_date_idx"),
             models.Index(fields=["commodity", "price_date"], name="mcp_commodity_date_idx"),
+            models.Index(fields=["source_key", "commodity"], name="mcp_source_commodity_idx"),
         ]
         constraints = [
             models.UniqueConstraint(

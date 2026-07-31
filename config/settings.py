@@ -115,6 +115,7 @@ INSTALLED_APPS = [
     "apps.users.apps.UsersConfig",
     "apps.commodities.apps.CommoditiesConfig",
     "apps.markets.apps.MarketsConfig",
+    "apps.market_integrations.apps.MarketIntegrationsConfig",
     "apps.areas.apps.AreasConfig",
     "apps.listings.apps.ListingsConfig",
     "apps.orders.apps.OrdersConfig",
@@ -276,4 +277,20 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "API for the Smart Market and Price Decision Support System.",
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
+}
+
+MARKET_INTEGRATION_TIMEOUT_SECONDS = int(os.environ.get("MARKET_INTEGRATION_TIMEOUT_SECONDS", "8"))
+MARKET_INTEGRATION_SOURCES = {
+    "platform_a": {
+        "name": "Platform A",
+        "base_url": os.environ.get("PLATFORM_A_BASE_URL", "http://localhost:3001"),
+    },
+    "platform_b": {
+        "name": "Platform B",
+        "base_url": os.environ.get("PLATFORM_B_BASE_URL", "http://localhost:3002"),
+    },
+    "platform_c": {
+        "name": "Platform C",
+        "base_url": os.environ.get("PLATFORM_C_BASE_URL", "http://localhost:3003"),
+    },
 }

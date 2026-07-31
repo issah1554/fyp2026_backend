@@ -178,6 +178,7 @@ class MarketPriceListCreateView(MarketPriceMixin, APIView):
         price_date = request.query_params.get("price_date")
         date_from = request.query_params.get("date_from")
         date_to = request.query_params.get("date_to")
+        source_key = request.query_params.get("source_key")
 
         if market_id:
             queryset = queryset.filter(market__public_id=market_id)
@@ -191,6 +192,8 @@ class MarketPriceListCreateView(MarketPriceMixin, APIView):
             queryset = queryset.filter(price_date__gte=date_from)
         if date_to:
             queryset = queryset.filter(price_date__lte=date_to)
+        if source_key:
+            queryset = queryset.filter(source_key=source_key)
 
         return paginated_response(
             request,
@@ -204,6 +207,7 @@ class MarketPriceListCreateView(MarketPriceMixin, APIView):
                     "price_date": price_date or "",
                     "date_from": date_from or "",
                     "date_to": date_to or "",
+                    "source_key": source_key or "",
                 },
                 "sorting": {"ordering": "-price_date,market__name,commodity__name"},
             },
