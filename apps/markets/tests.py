@@ -34,6 +34,8 @@ class MarketCommodityPriceUniquenessTests(TestCase):
             created_by=self.user,
         )
         self.commodity = Commodity.objects.create(name="Maize")
+        from apps.commodities.models import CommodityUnit
+        self.unit = CommodityUnit.objects.create(name="Kilogram", symbol="kg")
         self.price_date = date(2026, 7, 28)
         self.client = APIClient()
         self.client.force_authenticate(self.user)
@@ -44,6 +46,8 @@ class MarketCommodityPriceUniquenessTests(TestCase):
             "commodity": self.commodity,
             "price_type": MarketCommodityPrice.PriceType.RETAIL,
             "price": Decimal("1000.00"),
+            "quantity": Decimal("1.00"),
+            "unit": self.unit,
             "currency": "TZS",
             "price_date": self.price_date,
             "created_by": self.user,
@@ -79,6 +83,8 @@ class MarketCommodityPriceUniquenessTests(TestCase):
                 "commodity_id": self.commodity.public_id,
                 "price_type": MarketCommodityPrice.PriceType.RETAIL,
                 "price": "1200.00",
+                "quantity": "1.00",
+                "unit_id": self.unit.public_id,
                 "currency": "TZS",
                 "price_date": self.price_date.isoformat(),
             },

@@ -3,7 +3,7 @@ from rest_framework import serializers
 from apps.areas.models import AdmArea
 from apps.areas.serializers import AdmAreaSerializer
 from apps.commodities.models import Commodity
-from apps.commodities.serializers import CommoditySerializer
+from apps.commodities.serializers import CommoditySerializer, CommodityUnitSerializer
 
 from .models import Market, MarketCommodityPrice
 
@@ -77,6 +77,8 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
     commodity_id = serializers.CharField(write_only=True)
     created_by_id = serializers.CharField(source="created_by.profile.public_id", read_only=True, default=None)
     updated_by_id = serializers.CharField(source="updated_by.profile.public_id", read_only=True, default=None)
+    unit_id = serializers.CharField(write_only=True)
+    unit = CommodityUnitSerializer(read_only=True)
 
     class Meta:
         model = MarketCommodityPrice
@@ -86,8 +88,11 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
             "market_id",
             "commodity",
             "commodity_id",
+            "unit",
+            "unit_id",
             "price_type",
             "price",
+            "quantity",
             "min_price",
             "max_price",
             "currency",
@@ -99,7 +104,7 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["price_id", "market", "commodity", "created_by_id", "updated_by_id", "created_at", "updated_at"]
+        read_only_fields = ["price_id", "market", "commodity", "unit", "created_by_id", "updated_by_id", "created_at", "updated_at"]
 
     def __init__(self, *args, **kwargs):
         self.fixed_market = kwargs.pop("fixed_market", None)
@@ -118,6 +123,13 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
         if not commodity:
             raise serializers.ValidationError(f"Commodity with public_id '{value}' does not exist.")
         return commodity
+
+    def validate_unit_id(self, value):
+        from apps.commodities.models import CommodityUnit
+        unit = CommodityUnit.objects.filter(public_id=value).first()
+        if not unit:
+            raise serializers.ValidationError(f"Unit with public_id '{value}' does not exist.")
+        return unit
 
     def validate_currency(self, value):
         return value.upper()
@@ -151,10 +163,12 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         market = self.fixed_market or validated_data.pop("market_id")
         commodity = validated_data.pop("commodity_id")
+        unit = validated_data.pop("unit_id")
         request = self.context.get("request")
         return MarketCommodityPrice.objects.create(
             market=market,
             commodity=commodity,
+            unit=unit,
             created_by=request.user,
             **validated_data,
         )
@@ -162,10 +176,13 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         market = validated_data.pop("market_id", None)
         commodity = validated_data.pop("commodity_id", None)
+        unit = validated_data.pop("unit_id", None)
         if market:
             instance.market = market
         if commodity:
             instance.commodity = commodity
+        if unit:
+            instance.unit = unit
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             instance.updated_by = request.user

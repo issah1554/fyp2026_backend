@@ -110,6 +110,11 @@ def upsert_market_price(record):
     commodity = get_or_create_commodity(record["commodity"])
     user = integration_user()
 
+    # Get the primary unit for the commodity
+    from apps.commodities.models import CommodityUnitMap
+    primary_map = CommodityUnitMap.objects.filter(commodity=commodity, is_primary=True).first()
+    unit = primary_map.unit if primary_map else None
+
     return MarketCommodityPrice.all_objects.update_or_create(
         market=market,
         commodity=commodity,
@@ -118,6 +123,8 @@ def upsert_market_price(record):
         deleted_at__isnull=True,
         defaults={
             "price": decimal_or_none(record.get("price_tzs")) or Decimal("0"),
+            "quantity": Decimal("1.00"),
+            "unit": unit,
             "currency": MarketCommodityPrice.Currency.TZS,
             "source_key": source_key,
             "source_name": record.get("source", ""),

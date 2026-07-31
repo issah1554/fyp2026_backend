@@ -83,6 +83,11 @@ class MarketCommodityPrice(models.Model):
         on_delete=models.CASCADE,
         related_name="market_prices",
     )
+    unit = models.ForeignKey(
+        "commodities.CommodityUnit",
+        on_delete=models.PROTECT,
+        related_name="market_prices",
+    )
     price_type = models.CharField(
         max_length=32,
         choices=PriceType.choices,
@@ -90,6 +95,7 @@ class MarketCommodityPrice(models.Model):
         blank=True,
     )
     price = models.DecimalField(max_digits=12, decimal_places=2)
+    quantity = models.DecimalField(max_digits=12, decimal_places=2)
     min_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     max_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     currency = models.CharField(

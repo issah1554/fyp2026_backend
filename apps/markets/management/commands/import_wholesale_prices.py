@@ -165,9 +165,10 @@ class Command(BaseCommand):
                         unit=unit,
                         defaults={"is_primary": True},
                     )
-                defaults = {
                     "price_type": MarketCommodityPrice.PriceType.WHOLESALE,
                     "price": self._representative_price(min_price, max_price),
+                    "quantity": Decimal("1.00"),
+                    "unit": unit,
                     "min_price": min_price,
                     "max_price": max_price,
                     "currency": currency,
