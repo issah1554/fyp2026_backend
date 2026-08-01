@@ -38,8 +38,8 @@ def configured_sources():
             "name": "Platform B",
             "base_url": "http://localhost:3002",
         },
-        "platform_c": {
-            "name": "Platform C",
+        "market_officers": {
+            "name": "Market Officers",
             "base_url": "http://localhost:3003",
         },
     }
@@ -57,6 +57,25 @@ def configured_sources():
 
 
 def fetch_json(source, path, params=None):
+    if source.key == "market_officers":
+        try:
+            from apps.markets.models import MarketCommodityPrice
+            queryset = MarketCommodityPrice.objects.select_related("market", "commodity").filter(source_key="market_officers")
+            results = []
+            for item in queryset:
+                results.append({
+                    "name": item.commodity.name,
+                    "latest_price_tzs": float(item.price),
+                    "latest_price_usd": float(item.price_usd) if item.price_usd else None,
+                    "volume": float(item.quantity) if item.quantity else None,
+                    "confidence": 1.0,
+                    "delay_minutes": 0,
+                    "time": item.price_date.isoformat(),
+                })
+            return {"provider": "Market Officers", "results": results}
+        except Exception as exc:
+            raise MarketSourceError(source.key, f"Failed to load market officers data: {exc}") from exc
+
     if source.key == "viwanda":
         import os
         file_path = os.path.join(settings.BASE_DIR, "apps", "market_integrations", "scrapper", "data", "prices.json")

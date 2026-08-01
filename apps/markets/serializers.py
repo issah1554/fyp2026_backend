@@ -165,6 +165,12 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
         commodity = validated_data.pop("commodity_id")
         unit = validated_data.pop("unit_id")
         request = self.context.get("request")
+        
+        if not validated_data.get("source_key"):
+            validated_data["source_key"] = "market_officers"
+        if not validated_data.get("source_name"):
+            validated_data["source_name"] = "Market Officers"
+            
         return MarketCommodityPrice.objects.create(
             market=market,
             commodity=commodity,

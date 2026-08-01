@@ -233,7 +233,7 @@ def integration_market_name(source_key):
     mapping = {
         "platform_a": "Platform A Integration Market",
         "platform_b": "Platform B Integration Market",
-        "platform_c": "Platform C Integration Market",
+        "market_officers": "Market Officers Collected Market",
         "viwanda": "Ministry of Industry and Trade Integration Market",
     }
     return mapping.get(source_key, f"{source_key.replace('_', ' ').title()} Integration Market")
@@ -265,8 +265,8 @@ def source_key_for_record(record):
         return "platform_a"
     if source_name == "platform b":
         return "platform_b"
-    if source_name == "platform c":
-        return "platform_c"
+    if source_name in ("platform c", "market officers", "market officer"):
+        return "market_officers"
     if source_name in ("viwanda", "scrapper", "ministry of industry and trade"):
         return "viwanda"
     return source_name.replace(" ", "_")
