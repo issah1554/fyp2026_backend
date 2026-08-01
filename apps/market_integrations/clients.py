@@ -57,6 +57,15 @@ def configured_sources():
 
 
 def fetch_json(source, path, params=None):
+    if source.key == "viwanda":
+        import os
+        file_path = os.path.join(settings.BASE_DIR, "apps", "market_integrations", "scrapper", "data", "prices.json")
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as exc:
+            raise MarketSourceError(source.key, f"Failed to read local scraper cache at {file_path}: {exc}") from exc
+
     url = source.url(path)
     if params:
         url = f"{url}?{urlencode(params)}"

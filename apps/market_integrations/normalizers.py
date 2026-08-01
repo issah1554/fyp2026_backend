@@ -99,8 +99,42 @@ def normalize_platform_c(payload):
     ]
 
 
+def normalize_viwanda(payload):
+    if not isinstance(payload, list):
+        payload = []
+    records = []
+    for item in payload:
+        min_p = item.get("min_price")
+        max_p = item.get("max_price")
+        if min_p is not None and max_p is not None:
+            price_tzs = (min_p + max_p) / 2
+        elif min_p is not None:
+            price_tzs = min_p
+        elif max_p is not None:
+            price_tzs = max_p
+        else:
+            price_tzs = None
+
+        raw_commodity = item.get("commodity") or ""
+        commodity = raw_commodity.split("(")[0].strip()
+
+        records.append(
+            normalized_record(
+                source="Ministry of Industry and Trade",
+                commodity=commodity,
+                price_tzs=price_tzs,
+                price_usd=None,
+                market=item.get("market"),
+                timestamp=item.get("date"),
+                raw=item,
+            )
+        )
+    return records
+
+
 NORMALIZERS = {
     "platform_a": normalize_platform_a,
     "platform_b": normalize_platform_b,
     "platform_c": normalize_platform_c,
+    "viwanda": normalize_viwanda,
 }

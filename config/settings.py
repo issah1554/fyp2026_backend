@@ -293,4 +293,10 @@ MARKET_INTEGRATION_SOURCES = {
         "name": "Platform C",
         "base_url": os.environ.get("PLATFORM_C_BASE_URL", "http://localhost:3003"),
     },
+    "viwanda": {
+        "name": "Ministry of Industry and Trade",
+        "base_url": os.environ.get("VIWANDA_BASE_URL", "https://www.viwanda.go.tz"),
+        "prices_path": "/documents/product-prices-domestic",
+        "health_path": "/documents/product-prices-domestic",
+    },
 }

@@ -45,7 +45,7 @@ class MarketIntegrationHealthView(APIView):
 @extend_schema(
     tags=["Market Integrations"],
     parameters=[
-        OpenApiParameter("source", str, description="Optional source key: platform_a, platform_b, or platform_c."),
+        OpenApiParameter("source", str, description="Optional source key: platform_a, platform_b, platform_c, or viwanda."),
         OpenApiParameter("commodity", str, description="Optional commodity symbol/name filter."),
         OpenApiParameter("market", str, description="Optional exact market filter."),
         OpenApiParameter("limit", int, description="Optional max records, capped at 500."),
@@ -103,7 +103,7 @@ class SourceNormalizedMarketPriceListView(APIView):
 @extend_schema(
     tags=["Market Integrations"],
     parameters=[
-        OpenApiParameter("source", str, description="Optional source key: platform_a, platform_b, or platform_c."),
+        OpenApiParameter("source", str, description="Optional source key: platform_a, platform_b, platform_c, or viwanda."),
         OpenApiParameter("commodity", str, description="Optional commodity filter."),
         OpenApiParameter("market", str, description="Optional exact market filter."),
         OpenApiParameter("limit", int, description="Optional max records, capped at 500."),
@@ -135,7 +135,7 @@ class StoredMarketPriceListView(APIView):
 @extend_schema(
     tags=["Market Integrations"],
     parameters=[
-        OpenApiParameter("source", str, description="Optional source key: platform_a, platform_b, or platform_c."),
+        OpenApiParameter("source", str, description="Optional source key: platform_a, platform_b, platform_c, or viwanda."),
         OpenApiParameter("commodity", str, description="Optional commodity filter."),
         OpenApiParameter("market", str, description="Optional exact market filter."),
         OpenApiParameter("limit", int, description="Optional max records to import, capped at 500."),

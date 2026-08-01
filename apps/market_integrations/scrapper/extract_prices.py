@@ -9,9 +9,10 @@ from typing import Any
 
 import pdfplumber
 
-PDF_DIRECTORY = Path("data/pdfs")
-JSON_OUTPUT_FILE = Path("data/prices.json")
-CSV_OUTPUT_FILE = Path("data/prices.csv")
+SCRAPPER_DIR = Path(__file__).resolve().parent
+PDF_DIRECTORY = SCRAPPER_DIR / "data" / "pdfs"
+JSON_OUTPUT_FILE = SCRAPPER_DIR / "data" / "prices.json"
+CSV_OUTPUT_FILE = SCRAPPER_DIR / "data" / "prices.csv"
 
 MONTHS_SW = {
     "januari": "01",
@@ -167,7 +168,7 @@ def extract_pdf_prices(pdf_path: Path) -> list[dict[str, Any]]:
     return records
 
 
-def write_json(records: list[dict[str, Any]], output_file: Path) -> None:
+def write_json(records: list[dict[str, Any]], output_file: Path = JSON_OUTPUT_FILE) -> None:
     output_file.parent.mkdir(parents=True, exist_ok=True)
     output_file.write_text(
         json.dumps(records, indent=2, ensure_ascii=False),
@@ -175,7 +176,7 @@ def write_json(records: list[dict[str, Any]], output_file: Path) -> None:
     )
 
 
-def write_csv(records: list[dict[str, Any]], output_file: Path) -> None:
+def write_csv(records: list[dict[str, Any]], output_file: Path = CSV_OUTPUT_FILE) -> None:
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
     fieldnames = [

@@ -10,16 +10,35 @@ from bs4 import BeautifulSoup
 
 BASE_URL = "https://www.viwanda.go.tz"
 LIST_URL = f"{BASE_URL}/documents/product-prices-domestic"
-OUTPUT_FILE = Path("data/documents.json")
+SCRAPPER_DIR = Path(__file__).resolve().parent
+OUTPUT_FILE = SCRAPPER_DIR / "data" / "documents.json"
 
 HEADERS = {
     "User-Agent": ("MarketPriceResearchCrawler/1.0 " "(contact: admin@example.com)")
 }
 
 
+def load_documents(documents_file: Path = OUTPUT_FILE) -> list[dict[str, str]]:
+    if not documents_file.exists():
+        return []
+    with documents_file.open("r", encoding="utf-8") as file:
+        documents = json.load(file)
+    if not isinstance(documents, list):
+        raise ValueError(f"Expected a list of documents in {documents_file}")
+    return documents
+
+
 def collect_documents(max_pages: int = 46) -> list[dict[str, str]]:
     documents: list[dict[str, str]] = []
     seen_urls: set[str] = set()
+
+    # Load existing to avoid duplicate entries and preserve old history
+    try:
+        existing = load_documents(OUTPUT_FILE)
+        seen_urls = {doc["url"] for doc in existing if "url" in doc}
+        documents.extend(existing)
+    except Exception:
+        pass
 
     with requests.Session() as session:
         session.headers.update(HEADERS)
@@ -28,12 +47,19 @@ def collect_documents(max_pages: int = 46) -> list[dict[str, str]]:
             url = f"{LIST_URL}?page={page}"
             print(f"Reading page {page}: {url}")
 
-            response = session.get(url, timeout=30)
-            response.raise_for_status()
+            try:
+                response = session.get(url, timeout=30)
+                response.raise_for_status()
+            except Exception as e:
+                print(f"Failed to read page {page}: {e}")
+                break
 
             soup = BeautifulSoup(response.text, "html.parser")
+            links = soup.select('a[href*="/uploads/documents/"]')
+            if not links:
+                break
 
-            for link in soup.select('a[href*="/uploads/documents/"]'):
+            for link in links:
                 href = link.get("href")
 
                 if not href:
@@ -46,7 +72,9 @@ def collect_documents(max_pages: int = 46) -> list[dict[str, str]]:
 
                 seen_urls.add(document_url)
 
-                documents.append(
+                # Prepend new documents to keep list chronological
+                documents.insert(
+                    0,
                     {
                         "title": link.get_text(" ", strip=True),
                         "url": document_url,

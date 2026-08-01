@@ -148,13 +148,23 @@ def integration_user():
 def get_or_create_commodity(symbol):
     name = commodity_name(symbol)
     commodity = Commodity.objects.filter(name__iexact=name).first()
-    if commodity:
-        return commodity
-    return Commodity.objects.create(
-        name=name,
-        unit="kg",
-        description="Created from market integration feed.",
+    if not commodity:
+        commodity = Commodity.objects.create(
+            name=name,
+            unit="kg",
+            description="Created from market integration feed.",
+        )
+    from apps.commodities.models import CommodityUnit, CommodityUnitMap
+    unit, _ = CommodityUnit.objects.get_or_create(
+        symbol="kg",
+        defaults={"name": "Kilogram"}
     )
+    CommodityUnitMap.objects.get_or_create(
+        commodity=commodity,
+        unit=unit,
+        defaults={"is_primary": True}
+    )
+    return commodity
 
 
 def get_or_create_market(record, source_key):
@@ -194,11 +204,37 @@ def commodity_name(symbol):
     return mapping.get(str(symbol).upper(), str(symbol).title())
 
 
+def check_viwanda_updates():
+    from apps.market_integrations.scrapper.pdfs_collector import collect_documents, save_documents
+    from apps.market_integrations.scrapper.downloader import download_documents
+    from apps.market_integrations.scrapper.extract_prices import extract_all_prices, write_json
+
+    # 1. Collect only first 2 pages of viwanda website for fast updates
+    documents = collect_documents(max_pages=2)
+    save_documents(documents)
+
+    # 2. Download any new PDFs
+    downloaded = download_documents()
+
+    # 3. Extract prices from downloaded PDFs to update the local prices.json
+    records = extract_all_prices()
+    write_json(records)
+
+    # 4. Sync the prices into Django DB
+    sync_result = sync_prices(source_key="viwanda")
+    return {
+        "downloaded_count": len(downloaded),
+        "total_extracted": len(records),
+        "sync_result": sync_result
+    }
+
+
 def integration_market_name(source_key):
     mapping = {
         "platform_a": "Platform A Integration Market",
         "platform_b": "Platform B Integration Market",
         "platform_c": "Platform C Integration Market",
+        "viwanda": "Ministry of Industry and Trade Integration Market",
     }
     return mapping.get(source_key, f"{source_key.replace('_', ' ').title()} Integration Market")
 
@@ -231,6 +267,8 @@ def source_key_for_record(record):
         return "platform_b"
     if source_name == "platform c":
         return "platform_c"
+    if source_name in ("viwanda", "scrapper", "ministry of industry and trade"):
+        return "viwanda"
     return source_name.replace(" ", "_")
 
 

@@ -4,8 +4,9 @@ from urllib.parse import unquote, urlparse
 
 import requests
 
-DOCUMENTS_FILE = Path("data/documents.json")
-DOWNLOAD_DIRECTORY = Path("data/pdfs")
+SCRAPPER_DIR = Path(__file__).resolve().parent
+DOCUMENTS_FILE = SCRAPPER_DIR / "data" / "documents.json"
+DOWNLOAD_DIRECTORY = SCRAPPER_DIR / "data" / "pdfs"
 DOWNLOAD_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
 
@@ -76,7 +77,7 @@ def download_documents(documents_file: Path = DOCUMENTS_FILE) -> list[Path]:
 if __name__ == "__main__":
     if not DOCUMENTS_FILE.exists():
         raise SystemExit(
-            f"{DOCUMENTS_FILE} was not found. Run `python pdfs-collector.py` first."
+            f"{DOCUMENTS_FILE} was not found. Run `python pdfs_collector.py` first."
         )
 
     downloaded_paths = download_documents()
