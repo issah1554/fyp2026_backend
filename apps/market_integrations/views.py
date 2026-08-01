@@ -42,13 +42,22 @@ class MarketIntegrationHealthView(APIView):
         )
 
 
+def positive_int(value, default):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
+
 @extend_schema(
     tags=["Market Integrations"],
     parameters=[
         OpenApiParameter("source", str, description="Optional source key: platform_a, platform_b, platform_c, or viwanda."),
         OpenApiParameter("commodity", str, description="Optional commodity symbol/name filter."),
         OpenApiParameter("market", str, description="Optional exact market filter."),
-        OpenApiParameter("limit", int, description="Optional max records, capped at 500."),
+        OpenApiParameter("page", int, description="Page number."),
+        OpenApiParameter("page_size", int, description="Items per page."),
     ],
     responses={200: NormalizedMarketPriceSerializer(many=True)},
 )
@@ -59,18 +68,35 @@ class NormalizedMarketPriceListView(APIView):
         source = request.query_params.get("source")
         commodity = request.query_params.get("commodity")
         market = request.query_params.get("market")
-        limit = positive_limit(request.query_params.get("limit"))
-        result = aggregate_prices(source_key=source, commodity=commodity, market=market, limit=limit)
+        page_number = positive_int(request.query_params.get("page"), 1)
+        page_size = min(positive_int(request.query_params.get("page_size"), 10), 100)
+        
+        result = aggregate_prices(source_key=source, commodity=commodity, market=market)
+        records = result["records"]
+        
+        # Paginate in-memory
+        total_items = len(records)
+        total_pages = (total_items + page_size - 1) // page_size if total_items > 0 else 1
+        page_number = min(page_number, total_pages)
+        start_idx = (page_number - 1) * page_size
+        page_records = records[start_idx : start_idx + page_size]
+        
         return collection_response(
-            result["records"],
+            page_records,
             meta={
+                "pagination": {
+                    "page": page_number,
+                    "page_size": page_size,
+                    "total_items": total_items,
+                    "total_pages": total_pages,
+                    "has_next": page_number < total_pages,
+                    "has_previous": page_number > 1,
+                },
                 "filters": {
                     "source": source or "",
                     "commodity": commodity or "",
                     "market": market or "",
-                    "limit": limit or "",
                 },
-                "count": len(result["records"]),
                 "errors": result["errors"],
             },
         )
@@ -83,18 +109,34 @@ class SourceNormalizedMarketPriceListView(APIView):
     def get(self, request, source):
         commodity = request.query_params.get("commodity")
         market = request.query_params.get("market")
-        limit = positive_limit(request.query_params.get("limit"))
-        result = aggregate_prices(source_key=source, commodity=commodity, market=market, limit=limit)
+        page_number = positive_int(request.query_params.get("page"), 1)
+        page_size = min(positive_int(request.query_params.get("page_size"), 10), 100)
+        
+        result = aggregate_prices(source_key=source, commodity=commodity, market=market)
+        records = result["records"]
+        
+        total_items = len(records)
+        total_pages = (total_items + page_size - 1) // page_size if total_items > 0 else 1
+        page_number = min(page_number, total_pages)
+        start_idx = (page_number - 1) * page_size
+        page_records = records[start_idx : start_idx + page_size]
+        
         return success_response(
-            result["records"],
+            page_records,
             meta={
+                "pagination": {
+                    "page": page_number,
+                    "page_size": page_size,
+                    "total_items": total_items,
+                    "total_pages": total_pages,
+                    "has_next": page_number < total_pages,
+                    "has_previous": page_number > 1,
+                },
                 "filters": {
                     "source": source,
                     "commodity": commodity or "",
                     "market": market or "",
-                    "limit": limit or "",
                 },
-                "count": len(result["records"]),
                 "errors": result["errors"],
             },
         )
@@ -106,7 +148,8 @@ class SourceNormalizedMarketPriceListView(APIView):
         OpenApiParameter("source", str, description="Optional source key: platform_a, platform_b, platform_c, or viwanda."),
         OpenApiParameter("commodity", str, description="Optional commodity filter."),
         OpenApiParameter("market", str, description="Optional exact market filter."),
-        OpenApiParameter("limit", int, description="Optional max records, capped at 500."),
+        OpenApiParameter("page", int, description="Page number."),
+        OpenApiParameter("page_size", int, description="Items per page."),
     ],
     responses={200: MarketCommodityPriceSerializer(many=True)},
 )
@@ -114,19 +157,35 @@ class StoredMarketPriceListView(APIView):
     permission_classes = [HasMarketIntegrationPermission]
 
     def get(self, request):
+        from django.core.paginator import Paginator, EmptyPage
         source = request.query_params.get("source")
         commodity = request.query_params.get("commodity")
         market = request.query_params.get("market")
-        limit = positive_limit(request.query_params.get("limit"))
-        queryset = stored_prices(source_key=source, commodity=commodity, market=market, limit=limit)
+        page_number = positive_int(request.query_params.get("page"), 1)
+        page_size = min(positive_int(request.query_params.get("page_size"), 10), 100)
+        
+        queryset = stored_prices(source_key=source, commodity=commodity, market=market)
+        paginator = Paginator(queryset, page_size)
+        try:
+            page = paginator.page(page_number)
+        except EmptyPage:
+            page = paginator.page(paginator.num_pages if paginator.num_pages > 0 else 1)
+            
         return collection_response(
-            MarketCommodityPriceSerializer(queryset, many=True).data,
+            MarketCommodityPriceSerializer(page.object_list, many=True).data,
             meta={
+                "pagination": {
+                    "page": page.number,
+                    "page_size": page_size,
+                    "total_items": paginator.count,
+                    "total_pages": paginator.num_pages,
+                    "has_next": page.has_next(),
+                    "has_previous": page.has_previous(),
+                },
                 "filters": {
                     "source": source or "",
                     "commodity": commodity or "",
                     "market": market or "",
-                    "limit": limit or "",
                 }
             },
         )
