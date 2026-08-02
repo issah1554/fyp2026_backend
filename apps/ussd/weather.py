@@ -6,6 +6,7 @@ from datetime import date
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
+from django.conf import settings
 from django.utils import timezone
 
 from .forecasting import get_season_name
@@ -78,6 +79,8 @@ def _weekday_label(value: str) -> str:
 
 class OpenMeteoWeatherService:
     def fetch_weekly_forecast(self, region: WeatherRegion) -> dict:
+        forecast_url = getattr(settings, "USSD_WEATHER_API_BASE_URL", OPEN_METEO_FORECAST_URL)
+        timeout = getattr(settings, "USSD_WEATHER_API_TIMEOUT_SECONDS", 10)
         params = urlencode(
             {
                 "latitude": region.latitude,
@@ -96,7 +99,7 @@ class OpenMeteoWeatherService:
             }
         )
         try:
-            with urlopen(f"{OPEN_METEO_FORECAST_URL}?{params}", timeout=10) as response:
+            with urlopen(f"{forecast_url}?{params}", timeout=timeout) as response:
                 payload = json.loads(response.read().decode("utf-8"))
         except Exception as exc:
             raise WeatherForecastUnavailable("Weather forecast not available right now.") from exc
