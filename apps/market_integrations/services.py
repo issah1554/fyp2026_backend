@@ -452,10 +452,7 @@ def get_or_create_commodity(symbol):
     if not commodity:
         commodity = Commodity.objects.create(name=name)
     from apps.commodities.models import CommodityUnit, CommodityUnitMap
-    unit, _ = CommodityUnit.objects.get_or_create(
-        symbol="kg",
-        defaults={"name": "Kilogram"}
-    )
+    unit = get_or_create_kilogram_unit()
     CommodityUnitMap.objects.get_or_create(
         commodity=commodity,
         unit=unit,
@@ -470,16 +467,25 @@ def get_primary_or_default_unit(commodity):
     primary_map = CommodityUnitMap.objects.filter(commodity=commodity, is_primary=True).first()
     if primary_map:
         return primary_map.unit
-    unit, _ = CommodityUnit.objects.get_or_create(
-        symbol="kg",
-        defaults={"name": "Kilogram"},
-    )
+    unit = get_or_create_kilogram_unit()
     CommodityUnitMap.objects.get_or_create(
         commodity=commodity,
         unit=unit,
         defaults={"is_primary": True},
     )
     return unit
+
+
+def get_or_create_kilogram_unit():
+    from apps.commodities.models import CommodityUnit
+
+    unit = (
+        CommodityUnit.objects.filter(symbol__iexact="kg").first()
+        or CommodityUnit.objects.filter(name__iexact="Kilogram").first()
+    )
+    if unit:
+        return unit
+    return CommodityUnit.objects.create(symbol="kg", name="Kilogram")
 
 
 def get_or_create_market(record, source_key):
