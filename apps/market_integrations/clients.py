@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from django.conf import settings
+from django.db import OperationalError, ProgrammingError
 
 
 DEFAULT_TIMEOUT_SECONDS = 8
@@ -15,10 +16,14 @@ class MarketDataSource:
     key: str
     name: str
     base_url: str
+    source_type: str = "api"
     prices_path: str = "/api/prices"
     health_path: str = "/api/health"
+    is_active: bool = True
 
     def url(self, path):
+        if not self.base_url:
+            return ""
         return f"{self.base_url.rstrip('/')}/{path.lstrip('/')}"
 
 
@@ -29,7 +34,17 @@ class MarketSourceError(Exception):
 
 
 def configured_sources():
-    defaults = {
+    try:
+        from .models import MarketIntegrationSource
+
+        sources = MarketIntegrationSource.objects.filter(is_active=True)
+        if sources.exists():
+            return {source.key: source for source in sources}
+    except (OperationalError, ProgrammingError):
+        pass
+
+    configured = getattr(settings, "MARKET_INTEGRATION_SOURCES", None)
+    defaults = configured or {
         "platform_a": {
             "name": "Platform A",
             "base_url": "http://localhost:3001",
@@ -40,19 +55,28 @@ def configured_sources():
         },
         "internal": {
             "name": "Internal System",
-            "base_url": "http://localhost:3003",
+            "source_type": "internal",
+            "base_url": "",
+        },
+        "viwanda": {
+            "name": "Ministry of Industry and Trade",
+            "source_type": "scraper",
+            "base_url": "https://www.viwanda.go.tz",
+            "prices_path": "/documents/product-prices-domestic",
+            "health_path": "/documents/product-prices-domestic",
         },
     }
-    configured = getattr(settings, "MARKET_INTEGRATION_SOURCES", defaults)
     return {
         key: MarketDataSource(
             key=key,
             name=value["name"],
-            base_url=value["base_url"],
+            source_type=value.get("source_type", "api"),
+            base_url=value.get("base_url", ""),
             prices_path=value.get("prices_path", "/api/prices"),
             health_path=value.get("health_path", "/api/health"),
+            is_active=value.get("is_active", True),
         )
-        for key, value in configured.items()
+        for key, value in defaults.items()
     }
 
 

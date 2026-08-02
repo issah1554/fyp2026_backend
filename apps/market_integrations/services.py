@@ -1,7 +1,9 @@
 from decimal import Decimal, InvalidOperation
 
-from django.db import transaction
 from django.contrib.auth import get_user_model
+from django.db import transaction
+from django.db.models import Max
+from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from apps.areas.models import AdmArea
@@ -12,14 +14,28 @@ from .clients import MarketSourceError, configured_sources, fetch_json
 from .normalizers import NORMALIZERS
 
 
+def update_source_state(source_key, **fields):
+    try:
+        from .models import MarketIntegrationSource
+
+        MarketIntegrationSource.all_objects.filter(key=source_key).update(**fields)
+    except Exception:
+        return
+
+
 def available_sources():
     return [
         {
             "key": source.key,
             "name": source.name,
+            "source_type": getattr(source, "source_type", "api"),
             "base_url": source.base_url,
             "prices_url": source.url(source.prices_path),
             "health_url": source.url(source.health_path),
+            "is_active": getattr(source, "is_active", True),
+            "last_checked_at": getattr(source, "last_checked_at", None),
+            "last_imported_at": getattr(source, "last_imported_at", None),
+            "last_seen_record_at": getattr(source, "last_seen_record_at", None),
         }
         for source in configured_sources().values()
     ]
@@ -30,8 +46,10 @@ def source_health():
     for source in configured_sources().values():
         try:
             payload = fetch_json(source, source.health_path)
+            update_source_state(source.key, last_checked_at=timezone.now())
             results.append({"source": source.key, "name": source.name, "ok": True, "payload": payload})
         except MarketSourceError as exc:
+            update_source_state(source.key, last_checked_at=timezone.now())
             results.append({"source": source.key, "name": source.name, "ok": False, "error": str(exc)})
     return results
 
@@ -165,6 +183,19 @@ def check_updates(source_key=None, commodity=None, market=None, limit=None):
         if is_new_record(record, latest_by_source, existing):
             new_records_by_source[key] += 1
 
+    checked_at = timezone.now()
+    for key in sources:
+        observed_values = [
+            datetime_or_none(record.get("timestamp"))
+            for record in result["records"]
+            if source_key_for_record(record) == key
+        ]
+        observed_values = [value for value in observed_values if value is not None]
+        update_fields = {"last_checked_at": checked_at}
+        if observed_values:
+            update_fields["last_seen_record_at"] = max(observed_values)
+        update_source_state(key, **update_fields)
+
     return {
         "sources": [
             {
@@ -203,6 +234,15 @@ def sync_prices(source_key=None, commodity=None, market=None, limit=None, new_on
                     created += 1
                 else:
                     updated += 1
+
+    imported_at = timezone.now()
+    for key in {source_key_for_record(record) for record in records}:
+        latest_observed = RawCommodityPrice.objects.filter(source_key=key).aggregate(value=Max("observed_at"))["value"]
+        update_source_state(
+            key,
+            last_imported_at=imported_at,
+            last_seen_record_at=latest_observed,
+        )
 
     return {
         "fetched": len(result["records"]),
