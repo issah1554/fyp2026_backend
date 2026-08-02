@@ -106,6 +106,19 @@ def stored_prices(source_key=None, commodity=None, market=None, limit=None):
     return queryset
 
 
+def raw_prices(source_key=None, commodity=None, market=None, limit=None):
+    queryset = RawCommodityPrice.objects.select_related("source", "market", "commodity", "unit", "normalized_price")
+    if source_key:
+        queryset = queryset.filter(source_key=source_key)
+    if commodity:
+        queryset = queryset.filter(commodity__name__iexact=commodity_name(commodity))
+    if market:
+        queryset = queryset.filter(market__name__iexact=market)
+    if limit:
+        queryset = queryset[:limit]
+    return queryset
+
+
 def latest_raw_price(source_key):
     return (
         RawCommodityPrice.objects.filter(source_key=source_key)

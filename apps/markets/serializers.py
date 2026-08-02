@@ -79,6 +79,7 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
     updated_by_id = serializers.CharField(source="updated_by.profile.public_id", read_only=True, default=None)
     unit_id = serializers.CharField(write_only=True)
     unit = CommodityUnitSerializer(read_only=True)
+    raw_prices_count = serializers.IntegerField(source="raw_prices.count", read_only=True)
 
     class Meta:
         model = MarketCommodityPrice
@@ -98,13 +99,14 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
             "currency",
             "source_key",
             "source_name",
+            "raw_prices_count",
             "price_date",
             "created_by_id",
             "updated_by_id",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["price_id", "market", "commodity", "unit", "created_by_id", "updated_by_id", "created_at", "updated_at"]
+        read_only_fields = ["price_id", "market", "commodity", "unit", "raw_prices_count", "created_by_id", "updated_by_id", "created_at", "updated_at"]
 
     def __init__(self, *args, **kwargs):
         self.fixed_market = kwargs.pop("fixed_market", None)
