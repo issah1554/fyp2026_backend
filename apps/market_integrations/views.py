@@ -1,3 +1,5 @@
+from django.core.paginator import EmptyPage, Paginator
+from django.db.models import Count, Q
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.views import APIView
 
@@ -50,12 +52,106 @@ def positive_int(value, default):
     return parsed if parsed > 0 else default
 
 
+def paginate_database_queryset(request, queryset):
+    page_number = positive_int(request.query_params.get("page"), 1)
+    page_size = min(positive_int(request.query_params.get("page_size"), 10), 100)
+    total_items = queryset.count()
+    total_pages = max((total_items + page_size - 1) // page_size, 1)
+    page_number = min(page_number, total_pages)
+    paginator = Paginator(queryset, page_size)
+
+    try:
+        page = paginator.page(page_number)
+    except EmptyPage:
+        page = paginator.page(total_pages)
+
+    return page, {
+        "page": page.number,
+        "page_size": page_size,
+        "total_items": total_items,
+        "total_pages": total_pages,
+        "has_next": page.has_next(),
+        "has_previous": page.has_previous(),
+    }
+
+
+STORED_PRICE_ORDERING = {
+    "source": "source_name",
+    "market": "market__name",
+    "commodity": "commodity__name",
+    "price": "price",
+    "price_date": "price_date",
+    "created_at": "created_at",
+    "raw_prices_count": "raw_prices_count",
+}
+
+RAW_PRICE_ORDERING = {
+    "source": "source_name",
+    "commodity": "commodity__name",
+    "market": "market__name",
+    "price": "price",
+    "reference": "source_reference",
+    "observed_at": "observed_at",
+    "normalized_price_id": "normalized_price__public_id",
+}
+
+
+def apply_ordering(queryset, requested_ordering, allowed_fields, default_ordering):
+    if not requested_ordering:
+        return queryset.order_by(*default_ordering), ""
+
+    direction = "-"
+    field_key = requested_ordering
+    if requested_ordering.startswith("-"):
+        field_key = requested_ordering[1:]
+    else:
+        direction = ""
+
+    field_name = allowed_fields.get(field_key)
+    if not field_name:
+        return queryset.order_by(*default_ordering), ""
+    if field_name == "raw_prices_count":
+        queryset = queryset.annotate(raw_prices_count=Count("raw_prices"))
+
+    return queryset.order_by(f"{direction}{field_name}"), requested_ordering
+
+
+def search_stored_prices(queryset, search):
+    if not search:
+        return queryset
+    return queryset.filter(
+        Q(source_key__icontains=search)
+        | Q(source_name__icontains=search)
+        | Q(market__name__icontains=search)
+        | Q(commodity__name__icontains=search)
+        | Q(price_type__icontains=search)
+        | Q(currency__icontains=search)
+    )
+
+
+def search_raw_prices(queryset, search):
+    if not search:
+        return queryset
+    return queryset.filter(
+        Q(source_key__icontains=search)
+        | Q(source_name__icontains=search)
+        | Q(source_reference__icontains=search)
+        | Q(market__name__icontains=search)
+        | Q(commodity__name__icontains=search)
+        | Q(price_type__icontains=search)
+        | Q(currency__icontains=search)
+        | Q(normalized_price__public_id__icontains=search)
+    )
+
+
 @extend_schema(
     tags=["Market Integrations"],
     parameters=[
         OpenApiParameter("source", str, description="Optional source key: platform_a, platform_b, internal, or viwanda."),
         OpenApiParameter("commodity", str, description="Optional commodity symbol/name filter."),
         OpenApiParameter("market", str, description="Optional exact market filter."),
+        OpenApiParameter("search", str, description="Optional search across source, commodity, and market."),
+        OpenApiParameter("ordering", str, description="Sort field. Prefix with - for descending."),
         OpenApiParameter("page", int, description="Page number."),
         OpenApiParameter("page_size", int, description="Items per page."),
     ],
@@ -157,36 +253,33 @@ class StoredMarketPriceListView(APIView):
     permission_classes = [HasMarketIntegrationPermission]
 
     def get(self, request):
-        from django.core.paginator import Paginator, EmptyPage
         source = request.query_params.get("source")
         commodity = request.query_params.get("commodity")
         market = request.query_params.get("market")
-        page_number = positive_int(request.query_params.get("page"), 1)
-        page_size = min(positive_int(request.query_params.get("page_size"), 10), 100)
+        search = request.query_params.get("search")
+        ordering = request.query_params.get("ordering")
         
         queryset = stored_prices(source_key=source, commodity=commodity, market=market)
-        paginator = Paginator(queryset, page_size)
-        try:
-            page = paginator.page(page_number)
-        except EmptyPage:
-            page = paginator.page(paginator.num_pages if paginator.num_pages > 0 else 1)
+        queryset = search_stored_prices(queryset, search)
+        queryset, applied_ordering = apply_ordering(
+            queryset,
+            ordering,
+            STORED_PRICE_ORDERING,
+            ("-price_date", "market__name", "commodity__name"),
+        )
+        page, pagination = paginate_database_queryset(request, queryset)
             
         return collection_response(
             MarketCommodityPriceSerializer(page.object_list, many=True).data,
             meta={
-                "pagination": {
-                    "page": page.number,
-                    "page_size": page_size,
-                    "total_items": paginator.count,
-                    "total_pages": paginator.num_pages,
-                    "has_next": page.has_next(),
-                    "has_previous": page.has_previous(),
-                },
+                "pagination": pagination,
                 "filters": {
                     "source": source or "",
                     "commodity": commodity or "",
                     "market": market or "",
-                }
+                },
+                "search": search or "",
+                "sorting": {"ordering": applied_ordering or "-price_date,market__name,commodity__name"},
             },
         )
 
@@ -197,6 +290,8 @@ class StoredMarketPriceListView(APIView):
         OpenApiParameter("source", str, description="Optional source key: platform_a, platform_b, internal, or viwanda."),
         OpenApiParameter("commodity", str, description="Optional commodity filter."),
         OpenApiParameter("market", str, description="Optional exact market filter."),
+        OpenApiParameter("search", str, description="Optional search across source, commodity, market, and reference."),
+        OpenApiParameter("ordering", str, description="Sort field. Prefix with - for descending."),
         OpenApiParameter("page", int, description="Page number."),
         OpenApiParameter("page_size", int, description="Items per page."),
     ],
@@ -206,37 +301,33 @@ class RawMarketPriceListView(APIView):
     permission_classes = [HasMarketIntegrationPermission]
 
     def get(self, request):
-        from django.core.paginator import EmptyPage, Paginator
-
         source = request.query_params.get("source")
         commodity = request.query_params.get("commodity")
         market = request.query_params.get("market")
-        page_number = positive_int(request.query_params.get("page"), 1)
-        page_size = min(positive_int(request.query_params.get("page_size"), 10), 100)
+        search = request.query_params.get("search")
+        ordering = request.query_params.get("ordering")
 
         queryset = raw_prices(source_key=source, commodity=commodity, market=market)
-        paginator = Paginator(queryset, page_size)
-        try:
-            page = paginator.page(page_number)
-        except EmptyPage:
-            page = paginator.page(paginator.num_pages if paginator.num_pages > 0 else 1)
+        queryset = search_raw_prices(queryset, search)
+        queryset, applied_ordering = apply_ordering(
+            queryset,
+            ordering,
+            RAW_PRICE_ORDERING,
+            ("-price_date", "market__name", "commodity__name"),
+        )
+        page, pagination = paginate_database_queryset(request, queryset)
 
         return collection_response(
             RawCommodityPriceSerializer(page.object_list, many=True).data,
             meta={
-                "pagination": {
-                    "page": page.number,
-                    "page_size": page_size,
-                    "total_items": paginator.count,
-                    "total_pages": paginator.num_pages,
-                    "has_next": page.has_next(),
-                    "has_previous": page.has_previous(),
-                },
+                "pagination": pagination,
                 "filters": {
                     "source": source or "",
                     "commodity": commodity or "",
                     "market": market or "",
                 },
+                "search": search or "",
+                "sorting": {"ordering": applied_ordering or "-price_date,market__name,commodity__name"},
             },
         )
 

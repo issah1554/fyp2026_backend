@@ -74,6 +74,7 @@ def normalize_platform_a(payload):
             price_tzs=item.get("price_tzs"),
             price_usd=item.get("price_usd"),
             volume=item.get("volume"),
+            market=item.get("market"),
             price_date=item.get("price_date"),
             timestamp=item.get("timestamp"),
             raw=item,

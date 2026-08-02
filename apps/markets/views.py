@@ -1,6 +1,6 @@
 from django.core.paginator import EmptyPage, Paginator
 from django.db import IntegrityError, transaction
-from django.db.models import OuterRef, Subquery
+from django.db.models import OuterRef, Q, Subquery
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
@@ -18,6 +18,15 @@ DEFAULT_PAGE_SIZE = 10
 MAX_PAGE_SIZE = 100
 PRICE_UNIQUENESS_ERROR = "A price for this market, commodity, and date already exists."
 
+MARKET_PRICE_ORDERING = {
+    "source": "source_name",
+    "market": "market__name",
+    "commodity": "commodity__name",
+    "price": "price",
+    "price_date": "price_date",
+    "created_at": "created_at",
+}
+
 
 def positive_int(value, default):
     try:
@@ -30,18 +39,21 @@ def positive_int(value, default):
 def paginated_response(request, queryset, serializer_class, extra_meta=None):
     page_number = positive_int(request.query_params.get("page"), 1)
     page_size = min(positive_int(request.query_params.get("page_size"), DEFAULT_PAGE_SIZE), MAX_PAGE_SIZE)
+    total_items = queryset.count()
+    total_pages = max((total_items + page_size - 1) // page_size, 1)
+    page_number = min(page_number, total_pages)
     paginator = Paginator(queryset, page_size)
     try:
         page = paginator.page(page_number)
     except EmptyPage:
-        page = paginator.page(paginator.num_pages)
+        page = paginator.page(total_pages)
 
     meta = {
         "pagination": {
             "page": page.number,
             "page_size": page_size,
-            "total_items": paginator.count,
-            "total_pages": paginator.num_pages,
+            "total_items": total_items,
+            "total_pages": total_pages,
             "has_next": page.has_next(),
             "has_previous": page.has_previous(),
         }
@@ -49,6 +61,37 @@ def paginated_response(request, queryset, serializer_class, extra_meta=None):
     if extra_meta:
         meta.update(extra_meta)
     return collection_response(serializer_class(page.object_list, many=True).data, meta=meta)
+
+
+def apply_ordering(queryset, requested_ordering, allowed_fields, default_ordering):
+    if not requested_ordering:
+        return queryset.order_by(*default_ordering), ""
+
+    direction = "-"
+    field_key = requested_ordering
+    if requested_ordering.startswith("-"):
+        field_key = requested_ordering[1:]
+    else:
+        direction = ""
+
+    field_name = allowed_fields.get(field_key)
+    if not field_name:
+        return queryset.order_by(*default_ordering), ""
+
+    return queryset.order_by(f"{direction}{field_name}"), requested_ordering
+
+
+def search_market_prices(queryset, search):
+    if not search:
+        return queryset
+    return queryset.filter(
+        Q(source_key__icontains=search)
+        | Q(source_name__icontains=search)
+        | Q(market__name__icontains=search)
+        | Q(commodity__name__icontains=search)
+        | Q(price_type__icontains=search)
+        | Q(currency__icontains=search)
+    )
 
 
 def duplicate_price_response():
@@ -178,6 +221,8 @@ class MarketPriceListCreateView(MarketPriceMixin, APIView):
         date_from = request.query_params.get("date_from")
         date_to = request.query_params.get("date_to")
         source_key = request.query_params.get("source_key")
+        search = request.query_params.get("search")
+        ordering = request.query_params.get("ordering")
 
         if market_id:
             queryset = queryset.filter(market__public_id=market_id)
@@ -193,6 +238,13 @@ class MarketPriceListCreateView(MarketPriceMixin, APIView):
             queryset = queryset.filter(price_date__lte=date_to)
         if source_key:
             queryset = queryset.filter(source_key=source_key)
+        queryset = search_market_prices(queryset, search)
+        queryset, applied_ordering = apply_ordering(
+            queryset,
+            ordering,
+            MARKET_PRICE_ORDERING,
+            ("-price_date", "market__name", "commodity__name"),
+        )
 
         return paginated_response(
             request,
@@ -208,7 +260,8 @@ class MarketPriceListCreateView(MarketPriceMixin, APIView):
                     "date_to": date_to or "",
                     "source_key": source_key or "",
                 },
-                "sorting": {"ordering": "-price_date,market__name,commodity__name"},
+                "search": search or "",
+                "sorting": {"ordering": applied_ordering or "-price_date,market__name,commodity__name"},
             },
         )
 

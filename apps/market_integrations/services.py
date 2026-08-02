@@ -309,8 +309,8 @@ def standardize_raw_prices(source_key=None, commodity=None, market=None, limit=N
     created = 0
     updated = 0
     with transaction.atomic():
-        for raw_price in queryset:
-            _, was_created = standardize_raw_price(raw_price)
+        for group in raw_price_groups(queryset):
+            _, was_created = standardize_raw_price_group(group)
             if was_created:
                 created += 1
             else:
@@ -318,8 +318,55 @@ def standardize_raw_prices(source_key=None, commodity=None, market=None, limit=N
     return {"created": created, "updated": updated, "errors": []}
 
 
-def standardize_raw_price(raw_price):
+def raw_price_groups(queryset):
+    groups = {}
+    for raw_price in queryset:
+        key = (
+            raw_price.market_id,
+            raw_price.commodity_id,
+            raw_price.price_date,
+            raw_price.price_type,
+            raw_price.unit_id,
+            raw_price.currency,
+        )
+        groups[key] = raw_price
+    return groups.values()
+
+
+def grouped_raw_prices(raw_price):
+    return RawCommodityPrice.objects.filter(
+        market=raw_price.market,
+        commodity=raw_price.commodity,
+        price_date=raw_price.price_date,
+        price_type=raw_price.price_type,
+        unit=raw_price.unit,
+        currency=raw_price.currency,
+        deleted_at__isnull=True,
+    )
+
+
+def average_decimal(values):
+    values = [value for value in values if value is not None]
+    if not values:
+        return Decimal("0.00")
+    return (sum(values) / Decimal(len(values))).quantize(Decimal("0.01"))
+
+
+def source_summary(raw_rows):
+    source_keys = sorted({row.source_key for row in raw_rows if row.source_key})
+    source_names = sorted({row.source_name for row in raw_rows if row.source_name})
+    if len(source_keys) == 1:
+        return source_keys[0], source_names[0] if source_names else source_keys[0]
+    return "aggregated", f"Aggregated ({len(source_keys)} sources)"
+
+
+def standardize_raw_price_group(raw_price):
     user = integration_user()
+    raw_rows = list(grouped_raw_prices(raw_price))
+    source_key, source_name = source_summary(raw_rows)
+    prices = [row.price for row in raw_rows]
+    quantities = [row.quantity for row in raw_rows]
+
     market_price, was_created = MarketCommodityPrice.all_objects.update_or_create(
         market=raw_price.market,
         commodity=raw_price.commodity,
@@ -327,19 +374,24 @@ def standardize_raw_price(raw_price):
         price_type=raw_price.price_type,
         deleted_at__isnull=True,
         defaults={
-            "price": raw_price.price,
-            "quantity": raw_price.quantity,
+            "price": average_decimal(prices),
+            "quantity": average_decimal(quantities),
             "unit": raw_price.unit,
-            "currency": MarketCommodityPrice.Currency.TZS,
-            "source_key": raw_price.source_key,
-            "source_name": raw_price.source_name,
+            "min_price": min(prices) if prices else None,
+            "max_price": max(prices) if prices else None,
+            "currency": raw_price.currency,
+            "source_key": source_key,
+            "source_name": source_name,
             "created_by": user,
             "updated_by": user,
         },
     )
-    raw_price.normalized_price = market_price
-    raw_price.updated_by = user
-    raw_price.save(update_fields=["normalized_price", "updated_by", "updated_at"])
+
+    RawCommodityPrice.all_objects.filter(pk__in=[row.pk for row in raw_rows]).update(
+        normalized_price=market_price,
+        updated_by_id=user.pk if user else None,
+        updated_at=timezone.now(),
+    )
     return market_price, was_created
 
 
