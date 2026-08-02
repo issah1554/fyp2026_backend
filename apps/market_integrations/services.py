@@ -6,7 +6,7 @@ from django.utils.dateparse import parse_datetime
 
 from apps.areas.models import AdmArea
 from apps.commodities.models import Commodity
-from apps.markets.models import Market, MarketCommodityPrice
+from apps.markets.models import Market, MarketCommodityPrice, RawCommodityPrice
 
 from .clients import MarketSourceError, configured_sources, fetch_json
 from .normalizers import NORMALIZERS
@@ -109,29 +109,51 @@ def upsert_market_price(record):
     market = get_or_create_market(record, source_key)
     commodity = get_or_create_commodity(record["commodity"])
     user = integration_user()
+    unit = get_primary_or_default_unit(commodity)
+    price_date = observed_at.date()
+    price_tzs = decimal_or_none(record.get("price_tzs")) or Decimal("0")
+    source_name = record.get("source", "")
+    price_type = MarketCommodityPrice.PriceType.WHOLESALE
 
-    # Get the primary unit for the commodity
-    from apps.commodities.models import CommodityUnitMap
-    primary_map = CommodityUnitMap.objects.filter(commodity=commodity, is_primary=True).first()
-    unit = primary_map.unit if primary_map else None
-
-    return MarketCommodityPrice.all_objects.update_or_create(
+    market_price, was_created = MarketCommodityPrice.all_objects.update_or_create(
         market=market,
         commodity=commodity,
-        price_date=observed_at.date(),
-        price_type=MarketCommodityPrice.PriceType.WHOLESALE,
+        price_date=price_date,
+        price_type=price_type,
         deleted_at__isnull=True,
         defaults={
-            "price": decimal_or_none(record.get("price_tzs")) or Decimal("0"),
+            "price": price_tzs,
             "quantity": Decimal("1.00"),
             "unit": unit,
             "currency": MarketCommodityPrice.Currency.TZS,
             "source_key": source_key,
-            "source_name": record.get("source", ""),
+            "source_name": source_name,
             "created_by": user,
             "updated_by": user,
         },
     )
+    RawCommodityPrice.all_objects.update_or_create(
+        market=market,
+        commodity=commodity,
+        price_date=price_date,
+        price_type=price_type,
+        source_key=source_key,
+        source_reference=source_reference_for_record(record),
+        deleted_at__isnull=True,
+        defaults={
+            "price": price_tzs,
+            "quantity": Decimal("1.00"),
+            "unit": unit,
+            "currency": RawCommodityPrice.Currency.TZS,
+            "source_name": source_name,
+            "observed_at": observed_at,
+            "raw_payload": record.get("raw") or record,
+            "normalized_price": market_price,
+            "created_by": user,
+            "updated_by": user,
+        },
+    )
+    return market_price, was_created
 
 
 def integration_user():
@@ -149,11 +171,7 @@ def get_or_create_commodity(symbol):
     name = commodity_name(symbol)
     commodity = Commodity.objects.filter(name__iexact=name).first()
     if not commodity:
-        commodity = Commodity.objects.create(
-            name=name,
-            unit="kg",
-            description="Created from market integration feed.",
-        )
+        commodity = Commodity.objects.create(name=name)
     from apps.commodities.models import CommodityUnit, CommodityUnitMap
     unit, _ = CommodityUnit.objects.get_or_create(
         symbol="kg",
@@ -165,6 +183,24 @@ def get_or_create_commodity(symbol):
         defaults={"is_primary": True}
     )
     return commodity
+
+
+def get_primary_or_default_unit(commodity):
+    from apps.commodities.models import CommodityUnit, CommodityUnitMap
+
+    primary_map = CommodityUnitMap.objects.filter(commodity=commodity, is_primary=True).first()
+    if primary_map:
+        return primary_map.unit
+    unit, _ = CommodityUnit.objects.get_or_create(
+        symbol="kg",
+        defaults={"name": "Kilogram"},
+    )
+    CommodityUnitMap.objects.get_or_create(
+        commodity=commodity,
+        unit=unit,
+        defaults={"is_primary": True},
+    )
+    return unit
 
 
 def get_or_create_market(record, source_key):
@@ -233,7 +269,7 @@ def integration_market_name(source_key):
     mapping = {
         "platform_a": "Platform A Integration Market",
         "platform_b": "Platform B Integration Market",
-        "market_officers": "Market Officers Collected Market",
+        "internal": "Internal System Collected Market",
         "viwanda": "Ministry of Industry and Trade Integration Market",
     }
     return mapping.get(source_key, f"{source_key.replace('_', ' ').title()} Integration Market")
@@ -265,11 +301,20 @@ def source_key_for_record(record):
         return "platform_a"
     if source_name == "platform b":
         return "platform_b"
-    if source_name in ("platform c", "market officers", "market officer"):
-        return "market_officers"
+    if source_name in ("internal system", "internal", "platform c", "market officers", "market officer"):
+        return "internal"
     if source_name in ("viwanda", "scrapper", "ministry of industry and trade"):
         return "viwanda"
     return source_name.replace(" ", "_")
+
+
+def source_reference_for_record(record):
+    raw = record.get("raw") or {}
+    for key in ("source_reference", "document", "document_name", "filename", "file", "url"):
+        value = raw.get(key) or record.get(key)
+        if value:
+            return str(value)[:255]
+    return ""
 
 
 def decimal_or_none(value):

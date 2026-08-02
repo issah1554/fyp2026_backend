@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib import messages
 
 from apps.market_integrations.services import sync_prices, check_viwanda_updates
-from .models import Market, MarketCommodityPrice
+from .models import Market, MarketCommodityPrice, RawCommodityPrice
 
 
 @admin.register(Market)
@@ -60,3 +60,24 @@ class MarketCommodityPriceAdmin(admin.ModelAdmin):
                 self.message_user(request, f"Error syncing {error['source']}: {error['error']}", messages.WARNING)
         except Exception as e:
             self.message_user(request, f"Error checking for updates: {e}", messages.ERROR)
+
+
+@admin.register(RawCommodityPrice)
+class RawCommodityPriceAdmin(admin.ModelAdmin):
+    list_display = (
+        "market",
+        "commodity",
+        "price_type",
+        "price",
+        "min_price",
+        "max_price",
+        "currency",
+        "source_key",
+        "price_date",
+        "observed_at",
+        "created_at",
+        "deleted_at",
+    )
+    list_filter = ("source_key", "price_type", "currency", "price_date", "market", "commodity")
+    search_fields = ("market__name", "commodity__name", "source_key", "source_name", "source_reference")
+    readonly_fields = ("public_id", "created_at", "updated_at")

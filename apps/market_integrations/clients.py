@@ -38,8 +38,8 @@ def configured_sources():
             "name": "Platform B",
             "base_url": "http://localhost:3002",
         },
-        "market_officers": {
-            "name": "Market Officers",
+        "internal": {
+            "name": "Internal System",
             "base_url": "http://localhost:3003",
         },
     }
@@ -57,10 +57,10 @@ def configured_sources():
 
 
 def fetch_json(source, path, params=None):
-    if source.key == "market_officers":
+    if source.key == "internal":
         try:
             from apps.markets.models import MarketCommodityPrice
-            queryset = MarketCommodityPrice.objects.select_related("market", "commodity").filter(source_key="market_officers")
+            queryset = MarketCommodityPrice.objects.select_related("market", "commodity").filter(source_key="internal")
             results = []
             for item in queryset:
                 results.append({
@@ -72,9 +72,9 @@ def fetch_json(source, path, params=None):
                     "delay_minutes": 0,
                     "time": item.price_date.isoformat(),
                 })
-            return {"provider": "Market Officers", "results": results}
+            return {"provider": "Internal System", "results": results}
         except Exception as exc:
-            raise MarketSourceError(source.key, f"Failed to load market officers data: {exc}") from exc
+            raise MarketSourceError(source.key, f"Failed to load internal price data: {exc}") from exc
 
     if source.key == "viwanda":
         import os

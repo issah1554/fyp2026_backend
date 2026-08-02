@@ -81,8 +81,8 @@ def normalize_platform_b(payload):
     ]
 
 
-def normalize_market_officers(payload):
-    source = payload.get("provider", "Market Officers")
+def normalize_internal(payload):
+    source = payload.get("provider", "Internal System")
     return [
         normalized_record(
             source=source,
@@ -135,6 +135,6 @@ def normalize_viwanda(payload):
 NORMALIZERS = {
     "platform_a": normalize_platform_a,
     "platform_b": normalize_platform_b,
-    "market_officers": normalize_market_officers,
+    "internal": normalize_internal,
     "viwanda": normalize_viwanda,
 }

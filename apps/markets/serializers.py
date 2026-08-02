@@ -167,9 +167,9 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         
         if not validated_data.get("source_key"):
-            validated_data["source_key"] = "market_officers"
+            validated_data["source_key"] = "internal"
         if not validated_data.get("source_name"):
-            validated_data["source_name"] = "Market Officers"
+            validated_data["source_name"] = "Internal System"
             
         return MarketCommodityPrice.objects.create(
             market=market,

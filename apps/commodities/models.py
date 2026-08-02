@@ -117,7 +117,7 @@ class CommodityUnitMap(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = "commodity_unit_maps"
+        db_table = "commodity_allowed_units"
         ordering = ["-is_primary", "unit__name"]
         constraints = [
             models.UniqueConstraint(
