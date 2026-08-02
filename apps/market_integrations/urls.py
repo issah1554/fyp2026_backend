@@ -4,6 +4,7 @@ from .views import (
     MarketIntegrationHealthView,
     MarketIntegrationSourceListView,
     MarketIntegrationSyncView,
+    MarketIntegrationUpdateCheckView,
     NormalizedMarketPriceListView,
     SourceNormalizedMarketPriceListView,
     StoredMarketPriceListView,
@@ -16,6 +17,7 @@ urlpatterns = [
     path("market-integrations/health", MarketIntegrationHealthView.as_view(), name="source-health"),
     path("market-integrations/live-prices", NormalizedMarketPriceListView.as_view(), name="normalized-live-price-list"),
     path("market-integrations/prices", StoredMarketPriceListView.as_view(), name="stored-price-list"),
+    path("market-integrations/updates", MarketIntegrationUpdateCheckView.as_view(), name="update-check"),
     path("market-integrations/sync", MarketIntegrationSyncView.as_view(), name="sync-prices"),
     path(
         "market-integrations/live-prices/<str:source>",

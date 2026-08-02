@@ -79,13 +79,124 @@ def stored_prices(source_key=None, commodity=None, market=None, limit=None):
     return queryset
 
 
-def sync_prices(source_key=None, commodity=None, market=None, limit=None):
+def latest_raw_price(source_key):
+    return (
+        RawCommodityPrice.objects.filter(source_key=source_key)
+        .order_by("-observed_at", "-price_date", "-created_at")
+        .first()
+    )
+
+
+def record_fingerprint(record):
+    source_key = source_key_for_record(record)
+    return (
+        source_key,
+        source_reference_for_record(record),
+        commodity_name(record.get("commodity")),
+        record.get("market") or integration_market_name(source_key),
+        datetime_or_none(record.get("timestamp")),
+    )
+
+
+def is_new_record(record, latest_by_source, existing_fingerprints):
+    observed_at = datetime_or_none(record.get("timestamp"))
+    if observed_at is None:
+        return False
+
+    source_key = source_key_for_record(record)
+    latest = latest_by_source.get(source_key)
+    if latest and observed_at <= latest.observed_at:
+        return False
+
+    return record_fingerprint(record) not in existing_fingerprints
+
+
+def existing_raw_fingerprints(records):
+    fingerprints = []
+    for record in records:
+        observed_at = datetime_or_none(record.get("timestamp"))
+        if observed_at is None:
+            continue
+        fingerprints.append(
+            {
+                "source_key": source_key_for_record(record),
+                "source_reference": source_reference_for_record(record),
+                "commodity": commodity_name(record.get("commodity")),
+                "market": record.get("market") or integration_market_name(source_key_for_record(record)),
+                "observed_at": observed_at,
+            }
+        )
+
+    existing = set()
+    for item in fingerprints:
+        queryset = RawCommodityPrice.objects.filter(
+            source_key=item["source_key"],
+            source_reference=item["source_reference"],
+            commodity__name__iexact=item["commodity"],
+            market__name__iexact=item["market"],
+            observed_at=item["observed_at"],
+        )
+        if queryset.exists():
+            existing.add(
+                (
+                    item["source_key"],
+                    item["source_reference"],
+                    str(item["commodity"] or ""),
+                    str(item["market"] or ""),
+                    item["observed_at"],
+                )
+            )
+    return existing
+
+
+def check_updates(source_key=None, commodity=None, market=None, limit=None):
     result = aggregate_prices(source_key=source_key, commodity=commodity, market=market, limit=limit)
+    sources = sorted({source_key_for_record(record) for record in result["records"]} | ({source_key} if source_key else set()))
+    latest_by_source = {key: latest_raw_price(key) for key in sources if key}
+    existing = existing_raw_fingerprints(result["records"])
+
+    records_by_source = {}
+    new_records_by_source = {}
+    for record in result["records"]:
+        key = source_key_for_record(record)
+        records_by_source.setdefault(key, 0)
+        new_records_by_source.setdefault(key, 0)
+        records_by_source[key] += 1
+        if is_new_record(record, latest_by_source, existing):
+            new_records_by_source[key] += 1
+
+    return {
+        "sources": [
+            {
+                "source": key,
+                "latest_stored_at": latest_by_source[key].observed_at.isoformat() if latest_by_source.get(key) else None,
+                "fetched": records_by_source.get(key, 0),
+                "new": new_records_by_source.get(key, 0),
+                "has_updates": new_records_by_source.get(key, 0) > 0,
+            }
+            for key in sources
+        ],
+        "errors": result["errors"],
+    }
+
+
+def sync_prices(source_key=None, commodity=None, market=None, limit=None, new_only=False):
+    result = aggregate_prices(source_key=source_key, commodity=commodity, market=market, limit=limit)
+    latest_by_source = {
+        key: latest_raw_price(key)
+        for key in {source_key_for_record(record) for record in result["records"]}
+    }
+    existing = existing_raw_fingerprints(result["records"]) if new_only else set()
+    records = [
+        record
+        for record in result["records"]
+        if not new_only or is_new_record(record, latest_by_source, existing)
+    ]
     created = 0
     updated = 0
 
     with transaction.atomic():
-        for record in result["records"]:
+        for record in records:
             market_price, was_created = upsert_market_price(record)
             if market_price:
                 if was_created:
@@ -94,6 +205,8 @@ def sync_prices(source_key=None, commodity=None, market=None, limit=None):
                     updated += 1
 
     return {
+        "fetched": len(result["records"]),
+        "selected": len(records),
         "created": created,
         "updated": updated,
         "errors": result["errors"],
@@ -301,7 +414,7 @@ def source_key_for_record(record):
         return "platform_a"
     if source_name == "platform b":
         return "platform_b"
-    if source_name in ("internal system", "internal", "platform c", "market officers", "market officer"):
+    if source_name in ("internal system", "internal", "market officers", "market officer"):
         return "internal"
     if source_name in ("viwanda", "scrapper", "ministry of industry and trade"):
         return "viwanda"

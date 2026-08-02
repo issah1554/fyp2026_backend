@@ -7,7 +7,7 @@ class Command(BaseCommand):
     help = "Fetch, normalize, and store market prices from configured integration sources."
 
     def add_arguments(self, parser):
-        parser.add_argument("--source", choices=["platform_a", "platform_b", "platform_c", "viwanda"])
+        parser.add_argument("--source", choices=["platform_a", "platform_b", "internal", "viwanda"])
         parser.add_argument("--commodity")
         parser.add_argument("--market")
         parser.add_argument("--limit", type=int)

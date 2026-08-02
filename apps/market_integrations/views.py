@@ -6,7 +6,7 @@ from apps.markets.serializers import MarketCommodityPriceSerializer
 
 from .permissions import HasMarketIntegrationPermission
 from .serializers import NormalizedMarketPriceSerializer
-from .services import aggregate_prices, available_sources, source_health, stored_prices, sync_prices
+from .services import aggregate_prices, available_sources, check_updates, source_health, stored_prices, sync_prices
 
 
 def positive_limit(value):
@@ -53,7 +53,7 @@ def positive_int(value, default):
 @extend_schema(
     tags=["Market Integrations"],
     parameters=[
-        OpenApiParameter("source", str, description="Optional source key: platform_a, platform_b, platform_c, or viwanda."),
+        OpenApiParameter("source", str, description="Optional source key: platform_a, platform_b, internal, or viwanda."),
         OpenApiParameter("commodity", str, description="Optional commodity symbol/name filter."),
         OpenApiParameter("market", str, description="Optional exact market filter."),
         OpenApiParameter("page", int, description="Page number."),
@@ -145,7 +145,7 @@ class SourceNormalizedMarketPriceListView(APIView):
 @extend_schema(
     tags=["Market Integrations"],
     parameters=[
-        OpenApiParameter("source", str, description="Optional source key: platform_a, platform_b, platform_c, or viwanda."),
+        OpenApiParameter("source", str, description="Optional source key: platform_a, platform_b, internal, or viwanda."),
         OpenApiParameter("commodity", str, description="Optional commodity filter."),
         OpenApiParameter("market", str, description="Optional exact market filter."),
         OpenApiParameter("page", int, description="Page number."),
@@ -194,7 +194,7 @@ class StoredMarketPriceListView(APIView):
 @extend_schema(
     tags=["Market Integrations"],
     parameters=[
-        OpenApiParameter("source", str, description="Optional source key: platform_a, platform_b, platform_c, or viwanda."),
+        OpenApiParameter("source", str, description="Optional source key: platform_a, platform_b, internal, or viwanda."),
         OpenApiParameter("commodity", str, description="Optional commodity filter."),
         OpenApiParameter("market", str, description="Optional exact market filter."),
         OpenApiParameter("limit", int, description="Optional max records to import, capped at 500."),
@@ -208,10 +208,35 @@ class MarketIntegrationSyncView(APIView):
         commodity = request.query_params.get("commodity")
         market = request.query_params.get("market")
         limit = positive_limit(request.query_params.get("limit"))
-        result = sync_prices(source_key=source, commodity=commodity, market=market, limit=limit)
+        new_only = request.query_params.get("new_only") in ("1", "true", "True", "yes")
+        result = sync_prices(source_key=source, commodity=commodity, market=market, limit=limit, new_only=new_only)
         return mutation_response(
             message="Market integration prices synced successfully.",
             data=result,
+            meta={
+                "filters": {
+                    "source": source or "",
+                    "commodity": commodity or "",
+                    "market": market or "",
+                    "limit": limit or "",
+                    "new_only": new_only,
+                }
+            },
+        )
+
+
+@extend_schema(tags=["Market Integrations"])
+class MarketIntegrationUpdateCheckView(APIView):
+    permission_classes = [HasMarketIntegrationPermission]
+
+    def get(self, request):
+        source = request.query_params.get("source")
+        commodity = request.query_params.get("commodity")
+        market = request.query_params.get("market")
+        limit = positive_limit(request.query_params.get("limit"))
+        result = check_updates(source_key=source, commodity=commodity, market=market, limit=limit)
+        return success_response(
+            result,
             meta={
                 "filters": {
                     "source": source or "",
