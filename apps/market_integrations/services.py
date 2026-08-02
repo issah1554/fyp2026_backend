@@ -23,6 +23,15 @@ def update_source_state(source_key, **fields):
         return
 
 
+def source_for_key(source_key):
+    try:
+        from .models import MarketIntegrationSource
+
+        return MarketIntegrationSource.all_objects.filter(key=source_key).first()
+    except Exception:
+        return None
+
+
 def available_sources():
     return [
         {
@@ -259,6 +268,7 @@ def upsert_market_price(record):
         return None, False
 
     source_key = source_key_for_record(record)
+    source = source_for_key(source_key)
     market = get_or_create_market(record, source_key)
     commodity = get_or_create_commodity(record["commodity"])
     user = integration_user()
@@ -298,6 +308,7 @@ def upsert_market_price(record):
             "quantity": Decimal("1.00"),
             "unit": unit,
             "currency": RawCommodityPrice.Currency.TZS,
+            "source": source,
             "source_name": source_name,
             "observed_at": observed_at,
             "raw_payload": record.get("raw") or record,

@@ -72,12 +72,13 @@ class RawCommodityPriceAdmin(admin.ModelAdmin):
         "min_price",
         "max_price",
         "currency",
+        "source",
         "source_key",
         "price_date",
         "observed_at",
         "created_at",
         "deleted_at",
     )
-    list_filter = ("source_key", "price_type", "currency", "price_date", "market", "commodity")
-    search_fields = ("market__name", "commodity__name", "source_key", "source_name", "source_reference")
+    list_filter = ("source", "source_key", "price_type", "currency", "price_date", "market", "commodity")
+    search_fields = ("market__name", "commodity__name", "source__name", "source_key", "source_name", "source_reference")
     readonly_fields = ("public_id", "created_at", "updated_at")

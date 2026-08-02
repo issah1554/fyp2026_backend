@@ -198,6 +198,13 @@ class RawCommodityPrice(models.Model):
         choices=Currency.choices,
         default=Currency.TZS,
     )
+    source = models.ForeignKey(
+        "market_integrations.MarketIntegrationSource",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="raw_commodity_prices",
+    )
     source_key = models.CharField(max_length=50)
     source_name = models.CharField(max_length=100)
     source_reference = models.CharField(max_length=255, blank=True)
@@ -234,6 +241,7 @@ class RawCommodityPrice(models.Model):
         db_table = "raw_commodity_prices"
         ordering = ["-price_date", "market__name", "commodity__name"]
         indexes = [
+            models.Index(fields=["source", "price_date"], name="rcp_source_fk_date_idx"),
             models.Index(fields=["source_key", "price_date"], name="rcp_source_date_idx"),
             models.Index(fields=["market", "price_date"], name="rcp_market_date_idx"),
             models.Index(fields=["commodity", "price_date"], name="rcp_commodity_date_idx"),
