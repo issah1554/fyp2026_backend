@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Max
 from django.utils import timezone
-from django.utils.dateparse import parse_datetime
+from django.utils.dateparse import parse_date, parse_datetime
 
 from apps.areas.models import AdmArea
 from apps.commodities.models import Commodity
@@ -122,7 +122,7 @@ def raw_prices(source_key=None, commodity=None, market=None, limit=None):
 def latest_raw_price(source_key):
     return (
         RawCommodityPrice.objects.filter(source_key=source_key)
-        .order_by("-observed_at", "-price_date", "-created_at")
+        .order_by("-price_date", "-observed_at", "-created_at")
         .first()
     )
 
@@ -134,18 +134,18 @@ def record_fingerprint(record):
         source_reference_for_record(record),
         commodity_name(record.get("commodity")),
         record.get("market") or integration_market_name(source_key),
-        datetime_or_none(record.get("timestamp")),
+        date_or_none(record.get("price_date"), record.get("timestamp")),
     )
 
 
 def is_new_record(record, latest_by_source, existing_fingerprints):
-    observed_at = datetime_or_none(record.get("timestamp"))
-    if observed_at is None:
+    price_date = date_or_none(record.get("price_date"), record.get("timestamp"))
+    if price_date is None:
         return False
 
     source_key = source_key_for_record(record)
     latest = latest_by_source.get(source_key)
-    if latest and observed_at <= latest.observed_at:
+    if latest and price_date <= latest.price_date:
         return False
 
     return record_fingerprint(record) not in existing_fingerprints
@@ -154,8 +154,8 @@ def is_new_record(record, latest_by_source, existing_fingerprints):
 def existing_raw_fingerprints(records):
     fingerprints = []
     for record in records:
-        observed_at = datetime_or_none(record.get("timestamp"))
-        if observed_at is None:
+        price_date = date_or_none(record.get("price_date"), record.get("timestamp"))
+        if price_date is None:
             continue
         fingerprints.append(
             {
@@ -163,7 +163,7 @@ def existing_raw_fingerprints(records):
                 "source_reference": source_reference_for_record(record),
                 "commodity": commodity_name(record.get("commodity")),
                 "market": record.get("market") or integration_market_name(source_key_for_record(record)),
-                "observed_at": observed_at,
+                "price_date": price_date,
             }
         )
 
@@ -174,7 +174,7 @@ def existing_raw_fingerprints(records):
             source_reference=item["source_reference"],
             commodity__name__iexact=item["commodity"],
             market__name__iexact=item["market"],
-            observed_at=item["observed_at"],
+            price_date=item["price_date"],
         )
         if queryset.exists():
             existing.add(
@@ -183,7 +183,7 @@ def existing_raw_fingerprints(records):
                     item["source_reference"],
                     str(item["commodity"] or ""),
                     str(item["market"] or ""),
-                    item["observed_at"],
+                    item["price_date"],
                 )
             )
     return existing
@@ -207,15 +207,19 @@ def check_updates(source_key=None, commodity=None, market=None, limit=None):
 
     checked_at = timezone.now()
     for key in sources:
-        observed_values = [
-            datetime_or_none(record.get("timestamp"))
+        price_date_values = [
+            date_or_none(record.get("price_date"), record.get("timestamp"))
             for record in result["records"]
             if source_key_for_record(record) == key
         ]
-        observed_values = [value for value in observed_values if value is not None]
+        price_date_values = [value for value in price_date_values if value is not None]
         update_fields = {"last_checked_at": checked_at}
-        if observed_values:
-            update_fields["last_seen_record_at"] = max(observed_values)
+        if price_date_values:
+            update_fields["last_seen_record_at"] = timezone.datetime.combine(
+                max(price_date_values),
+                timezone.datetime.min.time(),
+                tzinfo=timezone.get_current_timezone(),
+            )
         update_source_state(key, **update_fields)
 
     return {
@@ -234,6 +238,18 @@ def check_updates(source_key=None, commodity=None, market=None, limit=None):
 
 
 def sync_prices(source_key=None, commodity=None, market=None, limit=None, new_only=False):
+    import_result = import_raw_prices(source_key=source_key, commodity=commodity, market=market, limit=limit, new_only=new_only)
+    standardize_result = standardize_raw_prices(source_key=source_key, commodity=commodity, market=market, limit=limit)
+    return {
+        "fetched": import_result["fetched"],
+        "selected": import_result["selected"],
+        "created": standardize_result["created"],
+        "updated": standardize_result["updated"],
+        "errors": import_result["errors"],
+    }
+
+
+def import_raw_prices(source_key=None, commodity=None, market=None, limit=None, new_only=False):
     result = aggregate_prices(source_key=source_key, commodity=commodity, market=market, limit=limit)
     latest_by_source = {
         key: latest_raw_price(key)
@@ -250,8 +266,8 @@ def sync_prices(source_key=None, commodity=None, market=None, limit=None, new_on
 
     with transaction.atomic():
         for record in records:
-            market_price, was_created = upsert_market_price(record)
-            if market_price:
+            raw_price, was_created = upsert_raw_price(record)
+            if raw_price:
                 if was_created:
                     created += 1
                 else:
@@ -260,10 +276,20 @@ def sync_prices(source_key=None, commodity=None, market=None, limit=None, new_on
     imported_at = timezone.now()
     for key in {source_key_for_record(record) for record in records}:
         latest_observed = RawCommodityPrice.objects.filter(source_key=key).aggregate(value=Max("observed_at"))["value"]
+        latest_price_date = RawCommodityPrice.objects.filter(source_key=key).aggregate(value=Max("price_date"))["value"]
         update_source_state(
             key,
             last_imported_at=imported_at,
-            last_seen_record_at=latest_observed,
+            last_seen_record_at=latest_observed
+            or (
+                timezone.datetime.combine(
+                    latest_price_date,
+                    timezone.datetime.min.time(),
+                    tzinfo=timezone.get_current_timezone(),
+                )
+                if latest_price_date
+                else None
+            ),
         )
 
     return {
@@ -275,9 +301,52 @@ def sync_prices(source_key=None, commodity=None, market=None, limit=None, new_on
     }
 
 
-def upsert_market_price(record):
+def standardize_raw_prices(source_key=None, commodity=None, market=None, limit=None):
+    queryset = raw_prices(source_key=source_key, commodity=commodity, market=market).filter(normalized_price__isnull=True)
+    if limit:
+        queryset = queryset[:limit]
+
+    created = 0
+    updated = 0
+    with transaction.atomic():
+        for raw_price in queryset:
+            _, was_created = standardize_raw_price(raw_price)
+            if was_created:
+                created += 1
+            else:
+                updated += 1
+    return {"created": created, "updated": updated, "errors": []}
+
+
+def standardize_raw_price(raw_price):
+    user = integration_user()
+    market_price, was_created = MarketCommodityPrice.all_objects.update_or_create(
+        market=raw_price.market,
+        commodity=raw_price.commodity,
+        price_date=raw_price.price_date,
+        price_type=raw_price.price_type,
+        deleted_at__isnull=True,
+        defaults={
+            "price": raw_price.price,
+            "quantity": raw_price.quantity,
+            "unit": raw_price.unit,
+            "currency": MarketCommodityPrice.Currency.TZS,
+            "source_key": raw_price.source_key,
+            "source_name": raw_price.source_name,
+            "created_by": user,
+            "updated_by": user,
+        },
+    )
+    raw_price.normalized_price = market_price
+    raw_price.updated_by = user
+    raw_price.save(update_fields=["normalized_price", "updated_by", "updated_at"])
+    return market_price, was_created
+
+
+def upsert_raw_price(record):
     observed_at = datetime_or_none(record.get("timestamp"))
-    if observed_at is None:
+    price_date = date_or_none(record.get("price_date"), record.get("timestamp"))
+    if observed_at is None or price_date is None:
         return None, False
 
     source_key = source_key_for_record(record)
@@ -286,29 +355,11 @@ def upsert_market_price(record):
     commodity = get_or_create_commodity(record["commodity"])
     user = integration_user()
     unit = get_primary_or_default_unit(commodity)
-    price_date = observed_at.date()
     price_tzs = decimal_or_none(record.get("price_tzs")) or Decimal("0")
     source_name = record.get("source", "")
     price_type = MarketCommodityPrice.PriceType.WHOLESALE
 
-    market_price, was_created = MarketCommodityPrice.all_objects.update_or_create(
-        market=market,
-        commodity=commodity,
-        price_date=price_date,
-        price_type=price_type,
-        deleted_at__isnull=True,
-        defaults={
-            "price": price_tzs,
-            "quantity": Decimal("1.00"),
-            "unit": unit,
-            "currency": MarketCommodityPrice.Currency.TZS,
-            "source_key": source_key,
-            "source_name": source_name,
-            "created_by": user,
-            "updated_by": user,
-        },
-    )
-    RawCommodityPrice.all_objects.update_or_create(
+    raw_price, was_created = RawCommodityPrice.all_objects.update_or_create(
         market=market,
         commodity=commodity,
         price_date=price_date,
@@ -325,12 +376,11 @@ def upsert_market_price(record):
             "source_name": source_name,
             "observed_at": observed_at,
             "raw_payload": record.get("raw") or record,
-            "normalized_price": market_price,
             "created_by": user,
             "updated_by": user,
         },
     )
-    return market_price, was_created
+    return raw_price, was_created
 
 
 def integration_user():
@@ -510,6 +560,15 @@ def datetime_or_none(value):
     return parsed
 
 
+def date_or_none(value, fallback_timestamp=None):
+    if value:
+        parsed = parse_date(str(value)[:10])
+        if parsed:
+            return parsed
+    parsed_timestamp = datetime_or_none(fallback_timestamp)
+    return parsed_timestamp.date() if parsed_timestamp else None
+
+
 def model_defaults(record):
     return {
         "source_name": record.get("source", ""),
@@ -520,6 +579,7 @@ def model_defaults(record):
         "volume": decimal_or_none(record.get("volume")),
         "confidence": decimal_or_none(record.get("confidence")),
         "delay_minutes": record.get("delay_minutes"),
+        "price_date": date_or_none(record.get("price_date"), record.get("timestamp")),
         "observed_at": datetime_or_none(record.get("timestamp")),
         "raw_payload": record.get("raw") or {},
     }

@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 
 def as_float(value):
@@ -22,6 +22,20 @@ def parse_timestamp(value):
         return value
 
 
+def parse_price_date(value, fallback_timestamp=None):
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if value:
+        try:
+            return date.fromisoformat(str(value)[:10]).isoformat()
+        except ValueError:
+            pass
+    parsed_timestamp = parse_timestamp(fallback_timestamp)
+    return parsed_timestamp[:10] if parsed_timestamp else None
+
+
 def normalized_record(
     *,
     source,
@@ -29,6 +43,7 @@ def normalized_record(
     price_tzs,
     price_usd,
     timestamp,
+    price_date=None,
     market=None,
     volume=None,
     confidence=None,
@@ -44,6 +59,7 @@ def normalized_record(
         "volume": as_float(volume),
         "confidence": as_float(confidence),
         "delay_minutes": delay_minutes,
+        "price_date": parse_price_date(price_date, timestamp),
         "timestamp": parse_timestamp(timestamp),
         "raw": raw,
     }
@@ -58,6 +74,7 @@ def normalize_platform_a(payload):
             price_tzs=item.get("price_tzs"),
             price_usd=item.get("price_usd"),
             volume=item.get("volume"),
+            price_date=item.get("price_date"),
             timestamp=item.get("timestamp"),
             raw=item,
         )
@@ -74,6 +91,7 @@ def normalize_platform_b(payload):
             price_tzs=item.get("amount_tzs"),
             price_usd=item.get("amount_usd"),
             market=item.get("market"),
+            price_date=item.get("price_date"),
             timestamp=item.get("updated_at"),
             raw=item,
         )
@@ -92,6 +110,7 @@ def normalize_internal(payload):
             volume=item.get("volume"),
             confidence=item.get("confidence"),
             delay_minutes=item.get("delay_minutes"),
+            price_date=item.get("price_date"),
             timestamp=item.get("time"),
             raw=item,
         )
@@ -125,6 +144,7 @@ def normalize_viwanda(payload):
                 price_tzs=price_tzs,
                 price_usd=None,
                 market=item.get("market"),
+                price_date=item.get("price_date") or item.get("date"),
                 timestamp=item.get("date"),
                 raw=item,
             )

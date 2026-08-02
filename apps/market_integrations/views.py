@@ -6,7 +6,7 @@ from apps.markets.serializers import MarketCommodityPriceSerializer
 
 from .permissions import HasMarketIntegrationPermission
 from .serializers import NormalizedMarketPriceSerializer, RawCommodityPriceSerializer
-from .services import aggregate_prices, available_sources, check_updates, raw_prices, source_health, stored_prices, sync_prices
+from .services import aggregate_prices, available_sources, check_updates, import_raw_prices, raw_prices, source_health, standardize_raw_prices, stored_prices, sync_prices
 
 
 def positive_limit(value):
@@ -272,6 +272,41 @@ class MarketIntegrationSyncView(APIView):
                     "new_only": new_only,
                 }
             },
+        )
+
+
+@extend_schema(tags=["Market Integrations"])
+class MarketIntegrationRawImportView(APIView):
+    permission_classes = [HasMarketIntegrationPermission]
+
+    def post(self, request):
+        source = request.query_params.get("source")
+        commodity = request.query_params.get("commodity")
+        market = request.query_params.get("market")
+        limit = positive_limit(request.query_params.get("limit"))
+        new_only = request.query_params.get("new_only") in ("1", "true", "True", "yes")
+        result = import_raw_prices(source_key=source, commodity=commodity, market=market, limit=limit, new_only=new_only)
+        return mutation_response(
+            message="Raw market integration prices imported successfully.",
+            data=result,
+            meta={"filters": {"source": source or "", "commodity": commodity or "", "market": market or "", "limit": limit or "", "new_only": new_only}},
+        )
+
+
+@extend_schema(tags=["Market Integrations"])
+class MarketIntegrationStandardizeView(APIView):
+    permission_classes = [HasMarketIntegrationPermission]
+
+    def post(self, request):
+        source = request.query_params.get("source")
+        commodity = request.query_params.get("commodity")
+        market = request.query_params.get("market")
+        limit = positive_limit(request.query_params.get("limit"))
+        result = standardize_raw_prices(source_key=source, commodity=commodity, market=market, limit=limit)
+        return mutation_response(
+            message="Raw market integration prices standardised successfully.",
+            data=result,
+            meta={"filters": {"source": source or "", "commodity": commodity or "", "market": market or "", "limit": limit or ""}},
         )
 
 
