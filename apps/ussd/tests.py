@@ -8,7 +8,7 @@ from django.core.management import call_command
 from django.utils import timezone
 
 from apps.auth.models import Profile
-from apps.commodities.models import Market
+from apps.markets.models import Market
 from apps.users.models import Role
 from apps.ussd.forecasting import calendar_week_end_date
 

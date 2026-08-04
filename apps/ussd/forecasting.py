@@ -6,7 +6,8 @@ from pathlib import Path
 from django.conf import settings
 from django.utils import timezone
 
-from apps.commodities.models import Commodity, Market
+from apps.commodities.models import Commodity
+from apps.markets.models import Market
 
 
 MODEL_FILENAME = "morogoro_market_price_forecaster.joblib"

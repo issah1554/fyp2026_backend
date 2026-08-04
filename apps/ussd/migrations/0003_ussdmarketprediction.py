@@ -8,6 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('commodities', '0002_market'),
+        ('markets', '0001_initial'),
         ('ussd', '0002_ussdsubscriber_user'),
     ]
 
@@ -26,7 +27,7 @@ class Migration(migrations.Migration):
                 ('predicted_price', models.DecimalField(decimal_places=2, max_digits=14)),
                 ('currency', models.CharField(default='TZS', max_length=16)),
                 ('generated_at', models.DateTimeField(auto_now=True)),
-                ('market', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='ussd_predictions', to='commodities.market')),
+                ('market', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='ussd_predictions', to='markets.market')),
             ],
             options={
                 'ordering': ['market__name', 'commodity', 'pricetype', 'period', '-target_date'],

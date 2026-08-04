@@ -37,7 +37,7 @@ class ListingsApiTests(APITestCase):
 
         # Create category and commodity
         self.category = CommodityCategory.objects.create(name="Cereals", description="Grain Crops")
-        self.commodity = Commodity.objects.create(name="Maize", unit="kg", description="Dry Maize")
+        self.commodity = Commodity.objects.create(name="Maize")
         self.commodity.categories.add(self.category)
 
     def test_farmer_can_create_and_manage_listings(self):

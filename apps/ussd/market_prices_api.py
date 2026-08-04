@@ -17,12 +17,12 @@ class LiveMarketPricesUnavailable(Exception):
 
 
 class LiveMarketPriceService:
-    def __init__(self, base_url=None, timeout=10):
+    def __init__(self, base_url=None, timeout=None):
         self.base_url = (
             base_url
             or getattr(settings, "USSD_MARKET_PRICE_API_BASE_URL", DEFAULT_API_BASE_URL)
         ).rstrip("/")
-        self.timeout = timeout
+        self.timeout = timeout or getattr(settings, "USSD_MARKET_PRICE_API_TIMEOUT_SECONDS", 10)
 
     def _request_json(self, path, params=None):
         query = urlencode({key: value for key, value in (params or {}).items() if value not in (None, "")})

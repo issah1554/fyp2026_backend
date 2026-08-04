@@ -6,8 +6,7 @@ from rest_framework.test import APITestCase
 from apps.auth.models import Profile
 from apps.users.models import Role
 
-from .models import Commodity, CommodityCategory, CommodityUnit
-from .models import Commodity, CommodityCategory, Market, MarketPriceRecord
+from .models import Commodity, CommodityCategory, CommodityUnit, CommodityUnitMap
 
 
 class CommodityApiTests(APITestCase):
@@ -16,6 +15,7 @@ class CommodityApiTests(APITestCase):
             username="admin",
             email="admin@example.com",
             password="StrongPass123",
+            is_staff=True,
         )
         Profile.objects.create(
             user=self.admin,
@@ -41,8 +41,7 @@ class CommodityApiTests(APITestCase):
             "/api/v1/commodities",
             {
                 "name": "Maize",
-                "unit": "kg",
-                "description": "Dry maize grain",
+                # unit is now M2M — no raw "unit" or "description" field
                 "category_ids": [category_id],
             },
             format="json",
@@ -52,32 +51,46 @@ class CommodityApiTests(APITestCase):
         self.assertTrue(commodity_response.data["success"])
         self.assertEqual(commodity_response.data["data"]["name"], "Maize")
         self.assertEqual(commodity_response.data["data"]["categories"][0]["category_id"], category_id)
-        self.assertRegex(commodity_response.data["data"]["commodity_id"], r"^[1-9BCDFGHJKLMNPQRSTVWXYZbcdfghjkmnpqrstvwxyz]{10}$")
+        self.assertRegex(
+            commodity_response.data["data"]["commodity_id"],
+            r"^[1-9BCDFGHJKLMNPQRSTVWXYZbcdfghjkmnpqrstvwxyz]{10}$",
+        )
         self.assertNotIn("id", commodity_response.data["data"])
+        # description field no longer in response
+        self.assertNotIn("description", commodity_response.data["data"])
 
     def test_admin_can_manage_units_and_assign_unit_to_commodity(self):
+        # Create a unit — description is no longer accepted/returned
         unit_response = self.client.post(
             "/api/v1/commodities/units",
-            {"name": "Kilogram", "symbol": "Kg", "description": "Weight in kilograms"},
+            {"name": "Kilogram", "symbol": "Kg"},
             format="json",
         )
         self.assertEqual(unit_response.status_code, status.HTTP_201_CREATED)
         unit_id = unit_response.data["data"]["unit_id"]
         self.assertRegex(unit_id, r"^[1-9BCDFGHJKLMNPQRSTVWXYZbcdfghjkmnpqrstvwxyz]{10}$")
+        # description no longer in unit response
+        self.assertNotIn("description", unit_response.data["data"])
 
+        # Create commodity and assign primary unit via unit_id
         commodity_response = self.client.post(
             "/api/v1/commodities",
             {
                 "name": "Rice",
                 "unit_id": unit_id,
-                "description": "Milled rice",
             },
             format="json",
         )
         self.assertEqual(commodity_response.status_code, status.HTTP_201_CREATED)
+        # Backward-compatible: 'unit' still returns the primary unit's symbol
         self.assertEqual(commodity_response.data["data"]["unit"], "Kg")
+        # Backward-compatible: 'unit_detail' still returns the primary unit object
         self.assertEqual(commodity_response.data["data"]["unit_detail"]["unit_id"], unit_id)
+        # New: 'units' returns the full list
+        self.assertEqual(len(commodity_response.data["data"]["units"]), 1)
+        self.assertEqual(commodity_response.data["data"]["units"][0]["unit_id"], unit_id)
 
+        # Update unit symbol
         update_response = self.client.patch(
             f"/api/v1/commodities/units/{unit_id}",
             {"symbol": "kg"},
@@ -86,13 +99,38 @@ class CommodityApiTests(APITestCase):
         self.assertEqual(update_response.status_code, status.HTTP_200_OK)
         self.assertEqual(update_response.data["data"]["symbol"], "kg")
 
+        # List units
         list_response = self.client.get("/api/v1/commodities/units")
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)
         self.assertTrue(any(x["unit_id"] == unit_id for x in list_response.data["data"]))
 
+    def test_admin_can_assign_multiple_units_to_commodity(self):
+        kg = CommodityUnit.objects.create(name="Kilogram", symbol="kg")
+        bag = CommodityUnit.objects.create(name="Bag (90kg)", symbol="bag")
+
+        # Assign primary unit via unit_id and additional via unit_ids
+        commodity_response = self.client.post(
+            "/api/v1/commodities",
+            {
+                "name": "Maize",
+                "unit_id": kg.public_id,
+                "unit_ids": [bag.public_id],
+            },
+            format="json",
+        )
+        self.assertEqual(commodity_response.status_code, status.HTTP_201_CREATED)
+        data = commodity_response.data["data"]
+        # Primary unit exposed as backward-compat 'unit' string
+        self.assertEqual(data["unit"], "kg")
+        # Both units in the 'units' list
+        unit_symbols = {u["symbol"] for u in data["units"]}
+        self.assertIn("kg", unit_symbols)
+        self.assertIn("bag", unit_symbols)
+        self.assertEqual(len(data["units"]), 2)
+
     def test_public_user_can_list_and_get_commodities(self):
         category = CommodityCategory.objects.create(name="Vegetables")
-        commodity = Commodity.objects.create(name="Tomato", unit="crate")
+        commodity = Commodity.objects.create(name="Tomato")
         commodity.categories.add(category)
         self.client.force_authenticate(user=None)
 
@@ -117,7 +155,7 @@ class CommodityApiTests(APITestCase):
 
         response = self.client.post(
             "/api/v1/commodities",
-            {"name": "Rice", "unit": "kg"},
+            {"name": "Rice"},
             format="json",
         )
 
@@ -126,15 +164,20 @@ class CommodityApiTests(APITestCase):
 
     def test_admin_can_update_and_delete_commodity(self):
         category = CommodityCategory.objects.create(name="Fruits")
-        commodity = Commodity.objects.create(name="Mango", unit="piece")
+        kg = CommodityUnit.objects.create(name="Kilogram", symbol="kg")
+        commodity = Commodity.objects.create(name="Mango")
         commodity.categories.add(category)
+        CommodityUnitMap.objects.create(commodity=commodity, unit=kg, is_primary=True)
 
+        # Update unit via unit_id (change primary unit)
+        bag = CommodityUnit.objects.create(name="Basket", symbol="basket")
         update_response = self.client.patch(
             f"/api/v1/commodities/{commodity.public_id}",
-            {"unit": "basket", "category_ids": []},
+            {"unit_id": bag.public_id, "category_ids": []},
             format="json",
         )
         self.assertEqual(update_response.status_code, status.HTTP_200_OK)
+        # The new primary unit's symbol should be returned in 'unit'
         self.assertEqual(update_response.data["data"]["unit"], "basket")
         self.assertEqual(update_response.data["data"]["categories"], [])
 
@@ -143,9 +186,10 @@ class CommodityApiTests(APITestCase):
         self.assertFalse(Commodity.objects.filter(public_id=commodity.public_id).exists())
 
     def test_commodity_list_is_paginated_with_totals(self):
+        Commodity.objects.all().delete()
         category = CommodityCategory.objects.create(name="Cereals")
         for index in range(12):
-            commodity = Commodity.objects.create(name=f"Commodity {index:02d}", unit="kg")
+            commodity = Commodity.objects.create(name=f"Commodity {index:02d}")
             if index < 8:
                 commodity.categories.add(category)
 
@@ -165,9 +209,9 @@ class CommodityApiTests(APITestCase):
     def test_commodity_list_filters_by_search_and_category(self):
         cereals = CommodityCategory.objects.create(name="Cereals")
         vegetables = CommodityCategory.objects.create(name="Vegetables")
-        maize = Commodity.objects.create(name="Maize", unit="kg")
+        maize = Commodity.objects.create(name="Maize")
         maize.categories.add(cereals)
-        tomato = Commodity.objects.create(name="Tomato", unit="crate")
+        tomato = Commodity.objects.create(name="Tomato")
         tomato.categories.add(vegetables)
 
         category_response = self.client.get("/api/v1/commodities", {"category_id": cereals.public_id})
@@ -179,66 +223,10 @@ class CommodityApiTests(APITestCase):
         self.assertEqual(search_response.status_code, status.HTTP_200_OK)
         self.assertTrue(any(x["name"] == "Tomato" for x in search_response.data["data"]))
         self.assertFalse(any(x["name"] == "Maize" for x in search_response.data["data"]))
-    def test_prediction_markets_are_seeded(self):
-        market_names = list(Market.objects.filter(is_active=True).values_list("name", flat=True))
-        self.assertIn("Ifakara Central Market", market_names)
-        self.assertIn("Morogoro Central Market", market_names)
 
     def test_prediction_commodities_are_seeded(self):
-        commodity_names = list(Commodity.objects.filter(name__in=["Beans", "Rice"]).values_list("name", flat=True))
+        commodity_names = list(
+            Commodity.objects.filter(name__in=["Beans", "Rice"]).values_list("name", flat=True)
+        )
         self.assertIn("Beans", commodity_names)
         self.assertIn("Rice", commodity_names)
-
-    def test_market_officer_can_manage_market_price_records(self):
-        officer = get_user_model().objects.create_user(
-            username="officer",
-            email="officer@example.com",
-            password="StrongPass123",
-        )
-        Profile.objects.create(
-            user=officer,
-            role=Profile.Role.MARKET_OFFICER,
-            email_verified_at=timezone.now(),
-        )
-        self.client.force_authenticate(officer)
-        market = Market.objects.get(name="Ifakara Central Market")
-        commodity = Commodity.objects.get(name="Rice")
-
-        market_response = self.client.get("/api/v1/commodities/markets/")
-        self.assertEqual(market_response.status_code, status.HTTP_200_OK)
-        self.assertIn(market.public_id, [item["market_id"] for item in market_response.data["data"]])
-
-        create_response = self.client.post(
-            "/api/v1/commodities/market-records/",
-            {
-                "market_id": market.public_id,
-                "commodity_id": commodity.public_id,
-                "price_type": "Retail",
-                "unit": "KG",
-                "price": "2800.00",
-                "record_date": "2026-07-18",
-                "notes": "Morning collection",
-            },
-            format="json",
-        )
-        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
-        record_id = create_response.data["data"]["record_id"]
-        self.assertEqual(create_response.data["data"]["market"]["name"], "Ifakara Central Market")
-        self.assertEqual(create_response.data["data"]["commodity"]["name"], "Rice")
-        self.assertEqual(MarketPriceRecord.objects.get(public_id=record_id).created_by, officer)
-
-        update_response = self.client.patch(
-            f"/api/v1/commodities/market-records/{record_id}/",
-            {"price": "2850.00", "notes": "Verified afternoon update"},
-            format="json",
-        )
-        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(update_response.data["data"]["price"], "2850.00")
-
-        list_response = self.client.get("/api/v1/commodities/market-records/")
-        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
-        self.assertIn(record_id, [item["record_id"] for item in list_response.data["data"]])
-
-        delete_response = self.client.delete(f"/api/v1/commodities/market-records/{record_id}/")
-        self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
-        self.assertFalse(MarketPriceRecord.objects.filter(public_id=record_id).exists())

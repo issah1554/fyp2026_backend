@@ -115,6 +115,7 @@ INSTALLED_APPS = [
     "apps.users.apps.UsersConfig",
     "apps.commodities.apps.CommoditiesConfig",
     "apps.markets.apps.MarketsConfig",
+    "apps.market_integrations.apps.MarketIntegrationsConfig",
     "apps.areas.apps.AreasConfig",
     "apps.listings.apps.ListingsConfig",
     "apps.orders.apps.OrdersConfig",
@@ -277,3 +278,46 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
 }
+
+MARKET_INTEGRATION_TIMEOUT_SECONDS = int(os.environ.get("MARKET_INTEGRATION_TIMEOUT_SECONDS", "8"))
+MARKET_INTEGRATION_SOURCES = {
+    "platform_a": {
+        "name": "Platform A",
+        "base_url": os.environ.get("PLATFORM_A_BASE_URL", "http://localhost:3001"),
+    },
+    "platform_b": {
+        "name": "Platform B",
+        "base_url": os.environ.get("PLATFORM_B_BASE_URL", "http://localhost:3002"),
+    },
+    "internal": {
+        "name": "Internal System",
+        "source_type": "internal",
+        "base_url": "",
+    },
+    "viwanda": {
+        "name": "Ministry of Industry and Trade",
+        "source_type": "scraper",
+        "base_url": os.environ.get("VIWANDA_BASE_URL", "https://www.viwanda.go.tz"),
+        "prices_path": "/documents/product-prices-domestic",
+        "health_path": "/documents/product-prices-domestic",
+    },
+}
+
+USSD_MARKET_PRICE_API_BASE_URL = os.environ.get(
+    "USSD_MARKET_PRICE_API_BASE_URL",
+    "https://ditapi.databenki.co.tz/api/v1",
+)
+USSD_MARKET_PRICE_API_TIMEOUT_SECONDS = int(
+    os.environ.get("USSD_MARKET_PRICE_API_TIMEOUT_SECONDS", "10")
+)
+USSD_SIMULATOR_API_BASE_URL = os.environ.get(
+    "USSD_SIMULATOR_API_BASE_URL",
+    "http://localhost:8000/api/v1",
+)
+USSD_WEATHER_API_BASE_URL = os.environ.get(
+    "USSD_WEATHER_API_BASE_URL",
+    "https://api.open-meteo.com/v1/forecast",
+)
+USSD_WEATHER_API_TIMEOUT_SECONDS = int(
+    os.environ.get("USSD_WEATHER_API_TIMEOUT_SECONDS", "10")
+)

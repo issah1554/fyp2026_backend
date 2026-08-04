@@ -3,7 +3,7 @@ from rest_framework import serializers
 from apps.areas.models import AdmArea
 from apps.areas.serializers import AdmAreaSerializer
 from apps.commodities.models import Commodity
-from apps.commodities.serializers import CommoditySerializer
+from apps.commodities.serializers import CommoditySerializer, CommodityUnitSerializer
 
 from .models import Market, MarketCommodityPrice
 
@@ -77,6 +77,9 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
     commodity_id = serializers.CharField(write_only=True)
     created_by_id = serializers.CharField(source="created_by.profile.public_id", read_only=True, default=None)
     updated_by_id = serializers.CharField(source="updated_by.profile.public_id", read_only=True, default=None)
+    unit_id = serializers.CharField(write_only=True)
+    unit = CommodityUnitSerializer(read_only=True)
+    raw_prices_count = serializers.IntegerField(source="raw_prices.count", read_only=True)
 
     class Meta:
         model = MarketCommodityPrice
@@ -86,18 +89,24 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
             "market_id",
             "commodity",
             "commodity_id",
-            "pricetype",
+            "unit",
+            "unit_id",
+            "price_type",
             "price",
+            "quantity",
             "min_price",
             "max_price",
             "currency",
+            "source_key",
+            "source_name",
+            "raw_prices_count",
             "price_date",
             "created_by_id",
             "updated_by_id",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["price_id", "market", "commodity", "created_by_id", "updated_by_id", "created_at", "updated_at"]
+        read_only_fields = ["price_id", "market", "commodity", "unit", "raw_prices_count", "created_by_id", "updated_by_id", "created_at", "updated_at"]
 
     def __init__(self, *args, **kwargs):
         self.fixed_market = kwargs.pop("fixed_market", None)
@@ -117,6 +126,13 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(f"Commodity with public_id '{value}' does not exist.")
         return commodity
 
+    def validate_unit_id(self, value):
+        from apps.commodities.models import CommodityUnit
+        unit = CommodityUnit.objects.filter(public_id=value).first()
+        if not unit:
+            raise serializers.ValidationError(f"Unit with public_id '{value}' does not exist.")
+        return unit
+
     def validate_currency(self, value):
         return value.upper()
 
@@ -129,13 +145,13 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
         market = self.fixed_market or attrs.get("market_id") or getattr(self.instance, "market", None)
         commodity = attrs.get("commodity_id") or getattr(self.instance, "commodity", None)
         price_date = attrs.get("price_date") or getattr(self.instance, "price_date", None)
-        pricetype = attrs.get("pricetype", getattr(self.instance, "pricetype", None))
+        price_type = attrs.get("price_type", getattr(self.instance, "price_type", None))
         if market and commodity and price_date:
             queryset = MarketCommodityPrice.all_objects.filter(
                 market=market,
                 commodity=commodity,
                 price_date=price_date,
-                pricetype=pricetype,
+                price_type=price_type,
                 deleted_at__isnull=True,
             )
             if self.instance:
@@ -149,10 +165,18 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         market = self.fixed_market or validated_data.pop("market_id")
         commodity = validated_data.pop("commodity_id")
+        unit = validated_data.pop("unit_id")
         request = self.context.get("request")
+        
+        if not validated_data.get("source_key"):
+            validated_data["source_key"] = "internal"
+        if not validated_data.get("source_name"):
+            validated_data["source_name"] = "Internal System"
+            
         return MarketCommodityPrice.objects.create(
             market=market,
             commodity=commodity,
+            unit=unit,
             created_by=request.user,
             **validated_data,
         )
@@ -160,10 +184,13 @@ class MarketCommodityPriceSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         market = validated_data.pop("market_id", None)
         commodity = validated_data.pop("commodity_id", None)
+        unit = validated_data.pop("unit_id", None)
         if market:
             instance.market = market
         if commodity:
             instance.commodity = commodity
+        if unit:
+            instance.unit = unit
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             instance.updated_by = request.user
