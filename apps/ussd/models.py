@@ -6,6 +6,10 @@ from apps.commodities.models import Market
 
 
 class UssdSubscriber(models.Model):
+    class Language(models.TextChoices):
+        ENGLISH = "en", "English"
+        SWAHILI = "sw", "Swahili"
+
     class Role(models.TextChoices):
         FARMER = "farmer", "Farmer"
         ENTREPRENEUR = "entrepreneur", "Entrepreneur"
@@ -21,6 +25,11 @@ class UssdSubscriber(models.Model):
     )
     phone_number = models.CharField(max_length=32, unique=True)
     full_name = models.CharField(max_length=150)
+    preferred_language = models.CharField(
+        max_length=8,
+        choices=Language.choices,
+        default=Language.ENGLISH,
+    )
     role = models.CharField(max_length=32, choices=Role.choices)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

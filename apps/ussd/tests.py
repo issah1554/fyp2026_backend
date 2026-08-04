@@ -24,7 +24,7 @@ class UssdMenuViewTests(TestCase):
     def _get_role(self, code):
         return Role.objects.get(code=code)
 
-    def test_unregistered_user_is_prompted_to_register(self):
+    def test_unregistered_user_is_prompted_to_select_language(self):
         response = self.client.post(
             reverse("ussd:menu"),
             data={
@@ -36,7 +36,8 @@ class UssdMenuViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "CON Welcome to SmartMarket DSS.")
+        self.assertContains(response, "CON Select language")
+        self.assertContains(response, "2. Kiswahili")
 
     def test_api_v1_ussd_menu_endpoint_matches_gateway_url(self):
         response = self.client.post(
@@ -50,7 +51,7 @@ class UssdMenuViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "CON Welcome to SmartMarket DSS.")
+        self.assertContains(response, "CON Select language")
 
     def test_registration_flow_saves_subscriber_and_shows_main_menu(self):
         response = self.client.post(
@@ -59,7 +60,7 @@ class UssdMenuViewTests(TestCase):
                 "sessionId": "ATUssdSession123",
                 "serviceCode": "*384*83342#",
                 "phoneNumber": "+254700000001",
-                "text": "Jane Farmer*1",
+                "text": "1*Jane Farmer*1",
             },
         )
 
@@ -67,9 +68,26 @@ class UssdMenuViewTests(TestCase):
         self.assertContains(response, "CON Main Menu")
         subscriber = UssdSubscriber.objects.get(phone_number="+254700000001")
         self.assertIsNotNone(subscriber.user)
+        self.assertEqual(subscriber.preferred_language, UssdSubscriber.Language.ENGLISH)
         profile = Profile.objects.get(user=subscriber.user)
         self.assertEqual(profile.role.code, Profile.Role.FARMER)
         self.assertEqual(profile.phone_number, "+254700000001")
+
+    def test_swahili_registration_sets_language_and_shows_translated_menu(self):
+        response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession123",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": "+254700000099",
+                "text": "2*Asha Mkulima*1",
+            },
+        )
+
+        self.assertContains(response, "CON Menyu Kuu")
+        self.assertContains(response, "Bei za Sokoni")
+        subscriber = UssdSubscriber.objects.get(phone_number="+254700000099")
+        self.assertEqual(subscriber.preferred_language, UssdSubscriber.Language.SWAHILI)
 
     @patch("apps.ussd.views.get_forecast_service")
     def test_newly_registered_user_can_continue_to_prediction_menu(self, mock_service_factory):
@@ -88,7 +106,7 @@ class UssdMenuViewTests(TestCase):
                 "sessionId": "ATUssdSession123",
                 "serviceCode": "*384*83342#",
                 "phoneNumber": "+254700000001",
-                "text": "Jane Farmer*1",
+                "text": "1*Jane Farmer*1",
             },
         )
         prediction_response = self.client.post(
@@ -97,7 +115,7 @@ class UssdMenuViewTests(TestCase):
                 "sessionId": "ATUssdSession123",
                 "serviceCode": "*384*83342#",
                 "phoneNumber": "+254700000001",
-                "text": "Jane Farmer*1*2",
+                "text": "1*Jane Farmer*1*2",
             },
         )
         commodity_response = self.client.post(
@@ -106,7 +124,7 @@ class UssdMenuViewTests(TestCase):
                 "sessionId": "ATUssdSession123",
                 "serviceCode": "*384*83342#",
                 "phoneNumber": "+254700000001",
-                "text": "Jane Farmer*1*2*1",
+                "text": "1*Jane Farmer*1*2*1",
             },
         )
 
@@ -123,7 +141,7 @@ class UssdMenuViewTests(TestCase):
                 "sessionId": "ATUssdSession124",
                 "serviceCode": "*384*83342#",
                 "phoneNumber": "+254700000010",
-                "text": "Asha Trader*2",
+                "text": "1*Asha Trader*2",
             },
         )
         buyer_response = self.client.post(
@@ -132,7 +150,7 @@ class UssdMenuViewTests(TestCase):
                 "sessionId": "ATUssdSession125",
                 "serviceCode": "*384*83342#",
                 "phoneNumber": "+254700000011",
-                "text": "Bakari Buyer*3",
+                "text": "1*Bakari Buyer*3",
             },
         )
 
@@ -182,6 +200,27 @@ class UssdMenuViewTests(TestCase):
         profile.refresh_from_db()
         self.assertEqual(profile.farm_location, "Kilombero")
         self.assertEqual(profile.farm_group, "Mlima Group")
+
+    def test_swahili_subscriber_sees_translated_account_menu(self):
+        subscriber = UssdSubscriber.objects.create(
+            phone_number="+254700000013",
+            full_name="Asha Farmer",
+            preferred_language=UssdSubscriber.Language.SWAHILI,
+            role=UssdSubscriber.Role.FARMER,
+        )
+
+        response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession126",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": subscriber.phone_number,
+                "text": "5",
+            },
+        )
+
+        self.assertContains(response, "CON Akaunti Yangu")
+        self.assertContains(response, "Weka Tahadhari ya Bei")
 
     def test_view_profile_shows_farmer_farm_details(self):
         user = get_user_model().objects.create(username="+254700000001")
