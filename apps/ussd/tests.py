@@ -221,6 +221,81 @@ class UssdMenuViewTests(TestCase):
 
         self.assertContains(response, "CON Akaunti Yangu")
         self.assertContains(response, "Weka Tahadhari ya Bei")
+        self.assertContains(response, "Badili Lugha")
+
+    def test_account_menu_allows_english_user_to_change_language(self):
+        subscriber = UssdSubscriber.objects.create(
+            phone_number="+254700000014",
+            full_name="Jane Farmer",
+            preferred_language=UssdSubscriber.Language.ENGLISH,
+            role=UssdSubscriber.Role.FARMER,
+        )
+
+        menu_response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession127",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": subscriber.phone_number,
+                "text": "5",
+            },
+        )
+        change_response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession127",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": subscriber.phone_number,
+                "text": "5*6",
+            },
+        )
+        save_response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession127",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": subscriber.phone_number,
+                "text": "5*6*2",
+            },
+        )
+
+        self.assertContains(menu_response, "Change Language")
+        self.assertContains(change_response, "CON Select language")
+        self.assertContains(save_response, "END Lugha imebadilishwa kuwa Kiswahili.")
+        subscriber.refresh_from_db()
+        self.assertEqual(subscriber.preferred_language, UssdSubscriber.Language.SWAHILI)
+
+    def test_account_menu_allows_swahili_user_to_change_language(self):
+        subscriber = UssdSubscriber.objects.create(
+            phone_number="+254700000015",
+            full_name="Asha Farmer",
+            preferred_language=UssdSubscriber.Language.SWAHILI,
+            role=UssdSubscriber.Role.FARMER,
+        )
+
+        change_response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession128",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": subscriber.phone_number,
+                "text": "5*6",
+            },
+        )
+        save_response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession128",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": subscriber.phone_number,
+                "text": "5*6*1",
+            },
+        )
+
+        self.assertContains(change_response, "CON Chagua lugha")
+        self.assertContains(save_response, "END Language updated to English.")
+        subscriber.refresh_from_db()
+        self.assertEqual(subscriber.preferred_language, UssdSubscriber.Language.ENGLISH)
 
     def test_view_profile_shows_farmer_farm_details(self):
         user = get_user_model().objects.create(username="+254700000001")

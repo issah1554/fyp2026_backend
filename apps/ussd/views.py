@@ -724,6 +724,7 @@ class UssdMenuView(View):
                     "3. Weka Tahadhari ya Bei\n"
                     "4. Sasisha Eneo la Shamba\n"
                     "5. Sasisha Kikundi cha Shamba\n"
+                    "6. Badili Lugha\n"
                     "0. Rudi"
                 )
             return (
@@ -733,6 +734,7 @@ class UssdMenuView(View):
                 "3. Set Price Alert\n"
                 "4. Update Farm Location\n"
                 "5. Update Farm Group\n"
+                "6. Change Language\n"
                 "0. Back"
             )
         if language == UssdSubscriber.Language.SWAHILI:
@@ -741,6 +743,7 @@ class UssdMenuView(View):
                 "1. Tazama Wasifu\n"
                 "2. Badili Jukumu\n"
                 "3. Weka Tahadhari ya Bei\n"
+                "4. Badili Lugha\n"
                 "0. Rudi"
             )
         return (
@@ -748,6 +751,7 @@ class UssdMenuView(View):
             "1. View Profile\n"
             "2. Change Role\n"
             "3. Set Price Alert\n"
+            "4. Change Language\n"
             "0. Back"
         )
 
@@ -801,6 +805,11 @@ class UssdMenuView(View):
                 if language == UssdSubscriber.Language.SWAHILI:
                     return "CON Chagua zao la tahadhari\n1. Mahindi\n2. Mchele\n0. Rudi"
                 return "CON Select commodity alert\n1. Maize\n2. Rice\n0. Back"
+            language_option = "6" if subscriber.role == UssdSubscriber.Role.FARMER else "4"
+            if segments[1] == language_option:
+                if language == UssdSubscriber.Language.SWAHILI:
+                    return "CON Chagua lugha\n1. English\n2. Kiswahili\n0. Rudi"
+                return "CON Select language\n1. English\n2. Kiswahili\n0. Back"
             if segments[1] == "4" and subscriber.role == UssdSubscriber.Role.FARMER:
                 return "CON Enter farm location" if language == UssdSubscriber.Language.ENGLISH else "CON Weka eneo la shamba"
             if segments[1] == "5" and subscriber.role == UssdSubscriber.Role.FARMER:
@@ -808,6 +817,7 @@ class UssdMenuView(View):
             return self._text(language, "invalid_account_option")
 
         if len(segments) == 3:
+            language_option = "6" if subscriber.role == UssdSubscriber.Role.FARMER else "4"
             if segments[1] == "2":
                 role = ROLE_MAP.get(segments[2])
                 if role is None:
@@ -827,6 +837,15 @@ class UssdMenuView(View):
                 if language == UssdSubscriber.Language.SWAHILI:
                     return f"CON Weka bei lengwa ya {commodity_name}"
                 return f"CON Enter target price for {commodity_name}"
+            if segments[1] == language_option:
+                selected_language = LANGUAGE_MAP.get(segments[2])
+                if selected_language is None:
+                    return self._text(language, "invalid_language")
+                subscriber.preferred_language = selected_language
+                subscriber.save(update_fields=["preferred_language", "updated_at"])
+                if selected_language == UssdSubscriber.Language.SWAHILI:
+                    return "END Lugha imebadilishwa kuwa Kiswahili."
+                return "END Language updated to English."
             if segments[1] == "4" and subscriber.role == UssdSubscriber.Role.FARMER:
                 profile.farm_location = segments[2]
                 profile.save(update_fields=["farm_location", "updated_at"])
