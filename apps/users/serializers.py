@@ -197,7 +197,19 @@ class ManagedUserUpdateSerializer(serializers.ModelSerializer):
         if (removes_admin_role or deactivates_admin) and Profile.objects.filter(roles__code=Profile.Role.ADMIN, user__is_active=True).count() <= 1:
             raise serializers.ValidationError("At least one active admin must remain in the system.")
 
-        if request is None or self.instance != request.user:
+        if request is not None and self.instance != request.user:
+            restricted_fields = ["email", "first_name", "last_name", "phone_number", "username"]
+            for field in restricted_fields:
+                if field in attrs:
+                    current_value = getattr(self.instance, field, None)
+                    if current_value is None and field == "phone_number":
+                        profile = getattr(self.instance, "profile", None)
+                        current_value = getattr(profile, "phone_number", None) if profile else None
+                    new_value = attrs[field]
+                    if new_value != current_value:
+                        raise serializers.ValidationError(
+                            {field: f"Administrators are restricted from editing another user's {field.replace('_', ' ')}."}
+                        )
             return attrs
 
         removes_own_admin_role = current_has_admin and not next_has_admin

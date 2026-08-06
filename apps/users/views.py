@@ -152,12 +152,12 @@ class UserDetailView(UserAdminMixin, APIView):
             status_code=status.HTTP_200_OK,
         )
 
-    @extend_schema(responses={200: OpenApiResponse(description="User deleted.")})
+    @extend_schema(responses={200: OpenApiResponse(description="User deactivated.")})
     def delete(self, request, user_id):
         user = self.get_user(user_id)
         if user == request.user:
             return error_response(
-                message="You cannot delete your own account.",
+                message="You cannot deactivate your own account.",
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
         profile, _created = Profile.objects.get_or_create(user=user)
@@ -166,8 +166,9 @@ class UserDetailView(UserAdminMixin, APIView):
                 message="At least one active admin must remain in the system.",
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
-        user.delete()
-        return mutation_response(message="User deleted successfully.", status_code=status.HTTP_200_OK)
+        user.is_active = False
+        user.save()
+        return mutation_response(message="User deactivated successfully.", status_code=status.HTTP_200_OK)
 
 
 @extend_schema(tags=["Roles"])

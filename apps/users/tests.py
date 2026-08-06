@@ -91,7 +91,8 @@ class UserAdminApiTests(APITestCase):
 
         delete_response = self.client.delete(f"/api/v1/users/{profile.public_id}")
         self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
-        self.assertFalse(get_user_model().objects.filter(username="farmer1").exists())
+        self.assertTrue(get_user_model().objects.filter(username="farmer1").exists())
+        self.assertFalse(get_user_model().objects.get(username="farmer1").is_active)
 
     def test_non_admin_cannot_manage_users(self):
         user = get_user_model().objects.create_user(
