@@ -10,6 +10,7 @@ from django.utils import timezone
 from apps.auth.models import Profile
 from apps.markets.models import Market
 from apps.users.models import Role
+from apps.areas.models import AdmArea
 from apps.ussd.forecasting import calendar_week_end_date
 
 from .models import (
@@ -413,7 +414,9 @@ class UssdMenuViewTests(TestCase):
             full_name="Jane Farmer",
             role=UssdSubscriber.Role.FARMER,
         )
-        market = Market.objects.get(name="Ifakara Central Market")
+        user, _ = get_user_model().objects.get_or_create(username="temp_market_creator")
+        area, _ = AdmArea.objects.get_or_create(name="Default Area", defaults={"level": "district"})
+        market, _ = Market.objects.get_or_create(name="Ifakara Central Market", defaults={"public_id": "IFAKARA001", "admin_area": area, "created_by": user})
         UssdMarketPrediction.objects.create(
             market=market,
             commodity="Rice",
@@ -595,7 +598,9 @@ class UssdMenuViewTests(TestCase):
             full_name="Farmer User",
             role=UssdSubscriber.Role.FARMER,
         )
-        market = Market.objects.get(name="Ifakara Central Market")
+        user, _ = get_user_model().objects.get_or_create(username="temp_market_creator")
+        area, _ = AdmArea.objects.get_or_create(name="Default Area", defaults={"level": "district"})
+        market, _ = Market.objects.get_or_create(name="Ifakara Central Market", defaults={"public_id": "IFAKARA001", "admin_area": area, "created_by": user})
         UssdMarketRecommendation.objects.create(
             role=UssdMarketRecommendation.Role.FARMER,
             commodity="Rice",

@@ -36,12 +36,12 @@ def positive_int(value, default):
 
 
 def user_totals():
-    users = User.objects.select_related("profile", "profile__role")
+    users = User.objects.select_related("profile").prefetch_related("profile__roles")
     return {
         "total": users.count(),
         "active": users.filter(is_active=True).count(),
         "inactive": users.filter(is_active=False).count(),
-        "admins": users.filter(profile__role__code=Profile.Role.ADMIN).count(),
+        "admins": users.filter(profile__roles__code=Profile.Role.ADMIN).count(),
         "verified": users.filter(profile__email_verified_at__isnull=False).count(),
     }
 
@@ -50,7 +50,7 @@ class UserAdminMixin:
     permission_classes = [IsUserAdmin]
 
     def get_queryset(self):
-        return User.objects.select_related("profile", "profile__role").order_by("-date_joined")
+        return User.objects.select_related("profile").prefetch_related("profile__roles").order_by("-date_joined")
 
     def get_user(self, user_id):
         return get_object_or_404(self.get_queryset(), profile__public_id=user_id)
@@ -79,7 +79,7 @@ class UserListCreateView(UserAdminMixin, APIView):
 
         role = request.query_params.get("role")
         if role:
-            queryset = queryset.filter(profile__role__code=role)
+            queryset = queryset.filter(profile__roles__code=role)
 
         is_active = request.query_params.get("is_active")
         if is_active in {"true", "false"}:
@@ -161,7 +161,7 @@ class UserDetailView(UserAdminMixin, APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
         profile, _created = Profile.objects.get_or_create(user=user)
-        if profile.role.code == Profile.Role.ADMIN and Profile.objects.filter(role__code=Profile.Role.ADMIN, user__is_active=True).count() <= 1:
+        if profile.has_role(Profile.Role.ADMIN) and Profile.objects.filter(roles__code=Profile.Role.ADMIN, user__is_active=True).count() <= 1:
             return error_response(
                 message="At least one active admin must remain in the system.",
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -247,9 +247,9 @@ class RoleDetailView(UserAdminMixin, APIView):
         role = self.get_role(role_id)
         if role.is_system:
             return error_response(message="System roles cannot be deleted.", status_code=status.HTTP_400_BAD_REQUEST)
-        if role.code == Profile.Role.ADMIN and Profile.objects.filter(role__code=Profile.Role.ADMIN).count() <= 1:
+        if role.code == Profile.Role.ADMIN and Profile.objects.filter(roles__code=Profile.Role.ADMIN).count() <= 1:
             return error_response(message="At least one admin must remain in the system.", status_code=status.HTTP_400_BAD_REQUEST)
-        if Profile.objects.filter(role=role).exists():
+        if Profile.objects.filter(roles=role).exists():
             return error_response(message="Cannot delete a role assigned to users.", status_code=status.HTTP_400_BAD_REQUEST)
         role.delete()
         return mutation_response(message="Role deleted successfully.", status_code=status.HTTP_200_OK)

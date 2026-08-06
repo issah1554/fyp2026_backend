@@ -19,12 +19,14 @@ def default_profile_role():
 
 class ProfileSerializer(serializers.ModelSerializer):
     is_email_verified = serializers.BooleanField(read_only=True)
-    role = serializers.SlugRelatedField(slug_field="code", queryset=Role.objects.all())
+    roles = serializers.SlugRelatedField(slug_field="code", queryset=Role.objects.all(), many=True)
+    role = serializers.SerializerMethodField()
 
     class Meta:
         model = Profile
         fields = [
             "role",
+            "roles",
             "phone_number",
             "organization",
             "farm_location",
@@ -33,6 +35,11 @@ class ProfileSerializer(serializers.ModelSerializer):
             "email_verified_at",
         ]
         read_only_fields = ["email_verified_at"]
+
+    @extend_schema_field(serializers.CharField)
+    def get_role(self, profile):
+        first_role = profile.roles.first()
+        return first_role.code if first_role else ""
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -65,7 +72,7 @@ class LoginUserSerializer(UserSerializer):
     def get_permissions(self, user):
         profile, _created = Profile.objects.get_or_create(user=user)
         return list(
-            Permission.objects.filter(role_links__role=profile.role)
+            Permission.objects.filter(role_links__role__profiles=profile)
             .order_by("code")
             .values_list("code", flat=True)
             .distinct()
@@ -79,7 +86,8 @@ class SessionUserSerializer(LoginUserSerializer):
 class RegisterSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(required=True)
     password = serializers.CharField(write_only=True, min_length=8)
-    role = serializers.SlugRelatedField(slug_field="code", queryset=Role.objects.all(), default=default_profile_role)
+    role = serializers.SlugRelatedField(slug_field="code", queryset=Role.objects.all(), required=False)
+    roles = serializers.SlugRelatedField(slug_field="code", queryset=Role.objects.all(), many=True, required=False)
     phone_number = serializers.CharField(required=False, allow_blank=True)
     organization = serializers.CharField(required=False, allow_blank=True)
     farm_location = serializers.CharField(required=False, allow_blank=True)
@@ -94,6 +102,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
             "role",
+            "roles",
             "phone_number",
             "organization",
             "farm_location",
@@ -114,8 +123,9 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
+        roles_val = validated_data.pop("roles", None)
+        role_val = validated_data.pop("role", None)
         profile_data = {
-            "role": validated_data.pop("role", Profile.Role.FARMER),
             "phone_number": validated_data.pop("phone_number", ""),
             "organization": validated_data.pop("organization", ""),
             "farm_location": validated_data.pop("farm_location", ""),
@@ -125,7 +135,18 @@ class RegisterSerializer(serializers.ModelSerializer):
         user = User(**validated_data)
         user.set_password(password)
         user.save()
-        Profile.objects.create(user=user, **profile_data)
+        profile = Profile.objects.create(user=user, **profile_data)
+        
+        if roles_val is not None:
+            profile.roles.set(roles_val)
+        elif role_val is not None:
+            profile.roles.set([role_val])
+        else:
+            from apps.users.models import Role
+            default_role = Role.objects.filter(code=Profile.Role.FARMER).first()
+            if default_role:
+                profile.roles.set([default_role])
+                
         return user
 
 

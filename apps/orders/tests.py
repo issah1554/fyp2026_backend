@@ -48,7 +48,7 @@ class OrdersApiTests(APITestCase):
         )
 
         # Create commodity, area, and listing
-        self.commodity = Commodity.objects.create(name="Rice", unit="kg", description="Premium Basmati")
+        self.commodity = Commodity.objects.create(name="Rice")
         self.area = AdmArea.objects.create(name="Mbeya", level="region")
         
         self.listing = CommodityListing.objects.create(

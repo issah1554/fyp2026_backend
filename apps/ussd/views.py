@@ -300,10 +300,10 @@ class UssdMenuView(View):
             user.save()
             profile = Profile.objects.create(
                 user=user,
-                role=profile_role,
                 phone_number=phone_number,
                 email_verified_at=timezone.now(),
             )
+            profile.roles.set([profile_role])
             return user, profile
 
         user = profile.user
@@ -312,10 +312,9 @@ class UssdMenuView(View):
         user.last_name = last_name
         user.save(update_fields=["username", "first_name", "last_name"])
 
-        update_fields = ["role", "phone_number", "updated_at"]
-        profile.role = profile_role
         profile.phone_number = phone_number
-        profile.save(update_fields=update_fields)
+        profile.save(update_fields=["phone_number", "updated_at"])
+        profile.roles.set([profile_role])
         return user, profile
 
     def _handle_registration(self, phone_number, segments):
@@ -687,22 +686,23 @@ class UssdMenuView(View):
     def _profile_for_subscriber(self, subscriber):
         profile_role = self._resolve_profile_role(subscriber.role)
         if subscriber.user_id:
-            profile, _created = Profile.objects.get_or_create(
+            profile, created = Profile.objects.get_or_create(
                 user=subscriber.user,
                 defaults={
-                    "role": profile_role,
                     "phone_number": subscriber.phone_number,
                 },
             )
+            if created:
+                profile.roles.set([profile_role])
+            else:
+                if not profile.has_role(profile_role.code):
+                    profile.roles.add(profile_role)
             profile_needs_update = False
-            if profile.role_id != profile_role.id:
-                profile.role = profile_role
-                profile_needs_update = True
             if not profile.phone_number:
                 profile.phone_number = subscriber.phone_number
                 profile_needs_update = True
             if profile_needs_update:
-                profile.save(update_fields=["role", "phone_number", "updated_at"])
+                profile.save(update_fields=["phone_number", "updated_at"])
             return profile
 
         user, profile = self._sync_backend_profile(
@@ -825,8 +825,8 @@ class UssdMenuView(View):
                 profile_role = self._resolve_profile_role(role)
                 subscriber.role = role
                 subscriber.save(update_fields=["role", "updated_at"])
-                profile.role = profile_role
-                profile.save(update_fields=["role", "updated_at"])
+                profile.roles.set([profile_role])
+                profile.save(update_fields=["updated_at"])
                 if language == UssdSubscriber.Language.SWAHILI:
                     return f"END Jukumu limebadilishwa kuwa {self._translate_role(subscriber.role, language)}."
                 return f"END Role updated to {subscriber.get_role_display()}."

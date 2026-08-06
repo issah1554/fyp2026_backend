@@ -9,10 +9,11 @@ def user_has_permission_code(user, permission_code):
     if user.is_staff or user.is_superuser:
         return True
     try:
-        role = user.profile.role
+        profile = user.profile
     except Profile.DoesNotExist:
         return False
-    return role.permission_links.filter(permission__code=permission_code).exists()
+    from apps.users.models import RolePermission
+    return RolePermission.objects.filter(role__profiles=profile, permission__code=permission_code).exists()
 
 
 class HasPermissionCode(BasePermission):

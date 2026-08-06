@@ -101,15 +101,15 @@ class Command(BaseCommand):
             user.set_password(password)
             user.save(update_fields=["password"])
 
-            Profile.objects.update_or_create(
+            profile, _ = Profile.objects.update_or_create(
                 user=user,
                 defaults={
-                    "role": roles[sample["role"]],
                     "phone_number": sample["phone_number"],
                     "organization": sample["organization"],
                     "email_verified_at": verified_at,
                 },
             )
+            profile.roles.set([roles[sample["role"]]])
 
             if created:
                 created_count += 1

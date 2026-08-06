@@ -17,7 +17,7 @@ class IsAdminOrAuthenticatedReadOnly(PublicReadPermissionCode):
         if user.is_staff or user.is_superuser:
             return True
         try:
-            return user.profile.role == Profile.Role.ADMIN
+            return user.profile.has_role(Profile.Role.ADMIN)
         except Profile.DoesNotExist:
             return False
 
@@ -32,6 +32,6 @@ class IsMarketOfficerOrAdmin(BasePermission):
         if user.is_staff or user.is_superuser:
             return True
         try:
-            return user.profile.role in {Profile.Role.MARKET_OFFICER, Profile.Role.ADMIN}
+            return user.profile.has_any_role(Profile.Role.MARKET_OFFICER, Profile.Role.ADMIN)
         except Profile.DoesNotExist:
             return False

@@ -373,7 +373,7 @@ class AuthApiTests(APITestCase):
         )
 
         login_response = self.client.post(
-            "/api/v1/auth/login/",
+            "/api/v1/auth/login",
             {
                 "username": "marketofficer",
                 "password": "StrongPass123",
@@ -391,7 +391,7 @@ class AuthApiTests(APITestCase):
         access = login_response.data["data"]["access"]
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
 
-        me_response = self.client.get("/api/v1/auth/me/")
+        me_response = self.client.get("/api/v1/auth/me")
         self.assertEqual(me_response.status_code, status.HTTP_200_OK)
         self.assertEqual(me_response.data["data"]["email"], "officer@example.com")
 
@@ -409,7 +409,7 @@ class AuthApiTests(APITestCase):
         )
 
         response = self.client.post(
-            "/api/v1/auth/login/",
+            "/api/v1/auth/login",
             {
                 "username": "buyer",
                 "password": "StrongPass123",

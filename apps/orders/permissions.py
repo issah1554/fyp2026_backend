@@ -13,7 +13,7 @@ class IsOrderParticipant(HasPermissionCode):
         if user.is_staff or user.is_superuser:
             return True
         try:
-            if user.profile.role.code == Profile.Role.ADMIN:
+            if user.profile.has_role(Profile.Role.ADMIN):
                 return True
         except Profile.DoesNotExist:
             pass

@@ -8,7 +8,7 @@ class ProfileAdmin(admin.ModelAdmin):
     list_display = (
         "public_id",
         "user",
-        "role",
+        "get_roles",
         "phone_number",
         "organization",
         "farm_location",
@@ -25,8 +25,12 @@ class ProfileAdmin(admin.ModelAdmin):
         "farm_location",
         "farm_group",
     )
-    list_filter = ("role", "email_verified_at")
+    list_filter = ("roles", "email_verified_at")
     readonly_fields = ("public_id",)
+
+    def get_roles(self, obj):
+        return ", ".join([role.code for role in obj.roles.all()])
+    get_roles.short_description = "Roles"
 
 
 @admin.register(EmailVerificationToken)

@@ -18,12 +18,14 @@ def default_profile_role():
 
 class ManagedProfileSerializer(serializers.ModelSerializer):
     is_email_verified = serializers.BooleanField(read_only=True)
-    role = serializers.SlugRelatedField(slug_field="code", queryset=Role.objects.all())
+    roles = serializers.SlugRelatedField(slug_field="code", queryset=Role.objects.all(), many=True)
+    role = serializers.SerializerMethodField()
 
     class Meta:
         model = Profile
         fields = [
             "role",
+            "roles",
             "phone_number",
             "organization",
             "farm_location",
@@ -32,6 +34,11 @@ class ManagedProfileSerializer(serializers.ModelSerializer):
             "email_verified_at",
         ]
         read_only_fields = ["is_email_verified", "email_verified_at"]
+
+    @extend_schema_field(serializers.CharField)
+    def get_role(self, profile):
+        first_role = profile.roles.first()
+        return first_role.code if first_role else ""
 
 
 class ManagedUserSerializer(serializers.ModelSerializer):
@@ -68,7 +75,8 @@ class ManagedUserSerializer(serializers.ModelSerializer):
 
 class ManagedUserCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
-    role = serializers.SlugRelatedField(slug_field="code", queryset=Role.objects.all(), default=default_profile_role)
+    role = serializers.SlugRelatedField(slug_field="code", queryset=Role.objects.all(), required=False)
+    roles = serializers.SlugRelatedField(slug_field="code", queryset=Role.objects.all(), many=True, required=False)
     phone_number = serializers.CharField(required=False, allow_blank=True)
     organization = serializers.CharField(required=False, allow_blank=True)
     farm_location = serializers.CharField(required=False, allow_blank=True)
@@ -86,6 +94,7 @@ class ManagedUserCreateSerializer(serializers.ModelSerializer):
             "is_staff",
             "is_superuser",
             "role",
+            "roles",
             "phone_number",
             "organization",
             "farm_location",
@@ -106,8 +115,9 @@ class ManagedUserCreateSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
+        roles_val = validated_data.pop("roles", None)
+        role_val = validated_data.pop("role", None)
         profile_data = {
-            "role": validated_data.pop("role", Profile.Role.FARMER),
             "phone_number": validated_data.pop("phone_number", ""),
             "organization": validated_data.pop("organization", ""),
             "farm_location": validated_data.pop("farm_location", ""),
@@ -117,12 +127,22 @@ class ManagedUserCreateSerializer(serializers.ModelSerializer):
         user = User(**validated_data)
         user.set_password(password)
         user.save()
-        Profile.objects.create(user=user, **profile_data)
+        profile = Profile.objects.create(user=user, **profile_data)
+        
+        if roles_val is not None:
+            profile.roles.set(roles_val)
+        elif role_val is not None:
+            profile.roles.set([role_val])
+        else:
+            default_role = Role.objects.filter(code=Profile.Role.FARMER).first()
+            if default_role:
+                profile.roles.set([default_role])
         return user
 
 
 class ManagedUserUpdateSerializer(serializers.ModelSerializer):
     role = serializers.SlugRelatedField(slug_field="code", queryset=Role.objects.all(), required=False)
+    roles = serializers.SlugRelatedField(slug_field="code", queryset=Role.objects.all(), many=True, required=False)
     phone_number = serializers.CharField(required=False, allow_blank=True)
     organization = serializers.CharField(required=False, allow_blank=True)
     farm_location = serializers.CharField(required=False, allow_blank=True)
@@ -139,6 +159,7 @@ class ManagedUserUpdateSerializer(serializers.ModelSerializer):
             "is_staff",
             "is_superuser",
             "role",
+            "roles",
             "phone_number",
             "organization",
             "farm_location",
@@ -159,21 +180,27 @@ class ManagedUserUpdateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         request = self.context.get("request")
         current_profile, _created = Profile.objects.get_or_create(user=self.instance)
-        next_role = attrs.get("role", current_profile.role)
-        next_role_code = next_role.code
-        current_role_code = current_profile.role.code
+        
+        current_has_admin = current_profile.roles.filter(code=Profile.Role.ADMIN).exists()
+        next_has_admin = current_has_admin
+        
+        if "roles" in attrs:
+            next_has_admin = any(r.code == Profile.Role.ADMIN for r in attrs["roles"])
+        elif "role" in attrs:
+            next_has_admin = attrs["role"].code == Profile.Role.ADMIN
+            
         next_is_active = attrs.get("is_active", self.instance.is_active)
-        removes_admin_role = current_role_code == Profile.Role.ADMIN and next_role_code != Profile.Role.ADMIN
-        deactivates_admin = current_role_code == Profile.Role.ADMIN and next_is_active is False
+        
+        removes_admin_role = current_has_admin and not next_has_admin
+        deactivates_admin = current_has_admin and next_is_active is False
 
-        if (removes_admin_role or deactivates_admin) and Profile.objects.filter(role__code=Profile.Role.ADMIN, user__is_active=True).count() <= 1:
+        if (removes_admin_role or deactivates_admin) and Profile.objects.filter(roles__code=Profile.Role.ADMIN, user__is_active=True).count() <= 1:
             raise serializers.ValidationError("At least one active admin must remain in the system.")
 
         if request is None or self.instance != request.user:
             return attrs
 
-        profile_role = attrs.get("role")
-        removes_own_admin_role = profile_role is not None and profile_role.code != Profile.Role.ADMIN
+        removes_own_admin_role = current_has_admin and not next_has_admin
         removes_staff_access = attrs.get("is_staff") is False and request.user.is_staff
         removes_superuser_access = attrs.get("is_superuser") is False and request.user.is_superuser
 
@@ -184,8 +211,9 @@ class ManagedUserUpdateSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
+        roles_val = validated_data.pop("roles", serializers.empty)
+        role_val = validated_data.pop("role", serializers.empty)
         profile_fields = {
-            "role": validated_data.pop("role", serializers.empty),
             "phone_number": validated_data.pop("phone_number", serializers.empty),
             "organization": validated_data.pop("organization", serializers.empty),
             "farm_location": validated_data.pop("farm_location", serializers.empty),
@@ -197,6 +225,12 @@ class ManagedUserUpdateSerializer(serializers.ModelSerializer):
         instance.save()
 
         profile, _created = Profile.objects.get_or_create(user=instance)
+        
+        if roles_val is not serializers.empty:
+            profile.roles.set(roles_val)
+        elif role_val is not serializers.empty:
+            profile.roles.set([role_val])
+            
         profile_update_fields = []
         for field, value in profile_fields.items():
             if value is not serializers.empty:

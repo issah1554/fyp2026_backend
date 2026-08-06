@@ -217,7 +217,7 @@ class MobileMarketOfficerMixin:
 
     def ensure_market_officer(self, user):
         profile, _created = Profile.objects.get_or_create(user=user)
-        if profile.role != Profile.Role.MARKET_OFFICER:
+        if not profile.has_role(Profile.Role.MARKET_OFFICER):
             raise PermissionDenied("Mobile access is available for market officers only.")
         return profile
 
