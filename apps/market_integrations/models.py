@@ -23,6 +23,7 @@ class MarketIntegrationSource(models.Model):
     base_url = models.URLField(max_length=500, blank=True)
     prices_path = models.CharField(max_length=255, default="/api/prices", blank=True)
     health_path = models.CharField(max_length=255, default="/api/health", blank=True)
+    sync_interval_hours = models.PositiveIntegerField(default=6, help_text="Number of hours to wait between automatic synchronizations.")
     is_active = models.BooleanField(default=True)
     last_checked_at = models.DateTimeField(null=True, blank=True)
     last_imported_at = models.DateTimeField(null=True, blank=True)

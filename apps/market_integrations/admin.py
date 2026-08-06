@@ -9,6 +9,7 @@ class MarketIntegrationSourceAdmin(admin.ModelAdmin):
         "key",
         "name",
         "source_type",
+        "sync_interval_hours",
         "is_active",
         "base_url",
         "last_checked_at",

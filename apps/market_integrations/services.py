@@ -641,3 +641,64 @@ def model_defaults(record):
         "observed_at": datetime_or_none(record.get("timestamp")),
         "raw_payload": record.get("raw") or {},
     }
+
+
+def run_automatic_sync():
+    """
+    Finds active market integration sources that haven't been synced in the last 6 hours,
+    triggers import and standardization, and manages DB connections.
+    """
+    import logging
+    from datetime import timedelta
+    from django.utils import timezone
+    from django.db import transaction, connections
+    from django.db.models import Q
+    from .models import MarketIntegrationSource
+
+    logger = logging.getLogger(__name__)
+    six_hours_ago = timezone.now() - timedelta(hours=6)
+
+    try:
+        # Get active sources
+        active_sources = MarketIntegrationSource.objects.filter(
+            is_active=True,
+            deleted_at__isnull=True
+        )
+
+        for source in active_sources:
+            interval = source.sync_interval_hours or 6
+            threshold = timezone.now() - timedelta(hours=interval)
+
+            if source.last_imported_at and source.last_imported_at >= threshold:
+                continue
+
+            # Prevent concurrent runs using database transaction lock
+            try:
+                with transaction.atomic():
+                    locked_source = MarketIntegrationSource.objects.select_for_update(nowait=True).filter(pk=source.pk).first()
+                    if not locked_source:
+                        continue
+                    if locked_source.last_imported_at and locked_source.last_imported_at >= threshold:
+                        continue
+
+                    # Temporarily update last_imported_at to prevent others from picking it up
+                    locked_source.last_imported_at = timezone.now()
+                    locked_source.save(update_fields=["last_imported_at", "updated_at"])
+            except Exception:
+                # Could not acquire lock, meaning another worker is processing it
+                continue
+
+            try:
+                logger.info(f"[Auto Sync] Starting synchronization for source: {source.key}")
+                if source.key == "viwanda":
+                    check_viwanda_updates()
+                else:
+                    sync_prices(source_key=source.key)
+                logger.info(f"[Auto Sync] Completed synchronization for source: {source.key}")
+            except Exception as e:
+                logger.error(f"[Auto Sync] Error syncing source {source.key}: {e}", exc_info=True)
+    except Exception as e:
+        logger.error(f"[Auto Sync] General error in run_automatic_sync: {e}", exc_info=True)
+    finally:
+        connections.close_all()
+
