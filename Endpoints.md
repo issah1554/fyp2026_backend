@@ -138,6 +138,21 @@ Permission notes:
 | GET | `/api/v1/orders/{order_id}` | `orders.read` | Bearer token | Working | Owner/participant rule. Get order by public ID. |
 | PATCH | `/api/v1/orders/{order_id}` | `orders.update` | Bearer token | Working | Owner/participant rule. Update order by public ID. |
 
+## Market Integrations
+
+| Method | Path | Permission Code | Auth | Status | Notes |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/market-integrations/sources` | `market_integrations.read` | Bearer token | Working | List market integration sources. |
+| GET | `/api/v1/market-integrations/health` | `market_integrations.read` | Bearer token | Working | Check integration sources health. |
+| GET | `/api/v1/market-integrations/live-prices` | `market_integrations.read` | Bearer token | Working | List normalized live prices. |
+| GET | `/api/v1/market-integrations/raw-prices` | `market_integrations.read` | Bearer token | Working | List raw market prices. |
+| GET | `/api/v1/market-integrations/prices` | `market_integrations.read` | Bearer token | Working | List stored market prices. |
+| POST | `/api/v1/market-integrations/import-raw` | `market_integrations.write` | Bearer token | Working | Import raw prices from external integration sources. |
+| POST | `/api/v1/market-integrations/standardize` | `market_integrations.write` | Bearer token | Working | Run standardization process on raw prices. |
+| GET | `/api/v1/market-integrations/updates` | `market_integrations.read` | Bearer token | Working | Check for updates from external integration sources. |
+| POST | `/api/v1/market-integrations/sync` | `market_integrations.write` | Bearer token | Working | Synchronize prices (both import and standardize). |
+| GET | `/api/v1/market-integrations/live-prices/{source}` | `market_integrations.read` | Bearer token | Working | Get live prices for a specific integration source. |
+
 ## USSD
 
 | Method | Path | Permission Code | Auth | Status | Notes |

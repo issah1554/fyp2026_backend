@@ -41,6 +41,8 @@ SYSTEM_PERMISSIONS = [
     ("orders.create", "Create orders", "Create orders."),
     ("orders.read", "Read orders", "Read order details."),
     ("orders.update", "Update orders", "Update orders."),
+    ("market_integrations.read", "Read market integrations", "View integration sources, health, price logs, and update status."),
+    ("market_integrations.write", "Write market integrations", "Run sync, raw import, and standardization of market integration data."),
 ]
 
 SYSTEM_ROLES = [
@@ -92,5 +94,7 @@ DEFAULT_ROLE_PERMISSIONS = {
         "areas.create",
         "areas.bulk_import",
         "areas.update",
+        "market_integrations.read",
+        "market_integrations.write",
     ],
 }
