@@ -14,11 +14,12 @@ class AdmAreaSerializer(serializers.ModelSerializer):
     area_id = serializers.CharField(source="public_id", read_only=True)
     parent_id = serializers.CharField(write_only=True, required=False, allow_null=True)
     parent = serializers.SerializerMethodField()
+    ancestors = serializers.SerializerMethodField()
 
     class Meta:
         model = AdmArea
-        fields = ["area_id", "name", "parent_id", "parent", "level", "created_at"]
-        read_only_fields = ["area_id", "parent", "created_at"]
+        fields = ["area_id", "name", "parent_id", "parent", "ancestors", "level", "created_at"]
+        read_only_fields = ["area_id", "parent", "ancestors", "created_at"]
         validators = []
 
     @extend_schema_field(serializers.DictField)
@@ -30,6 +31,21 @@ class AdmAreaSerializer(serializers.ModelSerializer):
                 "level": obj.parent.level,
             }
         return None
+
+    @extend_schema_field(serializers.DictField)
+    def get_ancestors(self, obj):
+        """Return a flat dict of ancestor names keyed by level (region, district).
+        Walks up the parent chain using already-selected related objects.
+        """
+        ancestors = {}
+        current = obj
+        while current.parent_id is not None:
+            parent = current.parent
+            if parent is None:
+                break
+            ancestors[parent.level] = parent.name
+            current = parent
+        return ancestors
 
     def validate_parent_id(self, value):
         if value:

@@ -19,7 +19,7 @@ AREA_PATH_LEVELS = [
 ]
 
 DEFAULT_PAGE_SIZE = 10
-MAX_PAGE_SIZE = 100
+MAX_PAGE_SIZE = 500
 
 
 def area_totals():
@@ -120,7 +120,8 @@ class AdmAreaMixin:
     permission_classes = [IsAdminOrReadOnly]
 
     def get_queryset(self):
-        return AdmArea.objects.all()
+        # select_related two levels deep so ancestors field resolves without extra queries
+        return AdmArea.objects.select_related("parent", "parent__parent").all()
 
     def get_area(self, area_id):
         return get_object_or_404(self.get_queryset(), public_id=area_id)
