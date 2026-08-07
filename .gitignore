@@ -22,3 +22,9 @@ django.log
 .env.*
 !.env.example
 docs/bruno/environments/
+
+# Machine Learning model binaries
+*.joblib
+ai/*.joblib
+ai/*.csv
+scratch/

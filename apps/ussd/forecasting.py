@@ -158,7 +158,7 @@ class MarketPriceForecaster:
 
     def get_market_options(self) -> list[tuple[str, str]]:
         markets = list(
-            Market.objects.filter(is_active=True)
+            Market.objects.filter(status="active")
             .order_by("name")
             .values_list("name", flat=True)
         )
