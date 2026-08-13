@@ -3,6 +3,7 @@ from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.views import APIView
 
+from apps.areas.models import AdmArea
 from apps.common.responses import collection_response, mutation_response, success_response
 from .models import CommodityListing
 from .permissions import IsSellerOrReadOnly
@@ -38,7 +39,11 @@ class CommodityListingListCreateView(CommodityListingMixin, APIView):
             
         area_id = request.query_params.get("area_id")
         if area_id:
-            queryset = queryset.filter(adm_area__public_id=area_id)
+            area = AdmArea.objects.filter(public_id=area_id).first()
+            if area is None:
+                queryset = queryset.none()
+            else:
+                queryset = queryset.filter(adm_area_id__in=area.descendant_ids())
             
         status_param = request.query_params.get("status")
         if status_param:

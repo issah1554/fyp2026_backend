@@ -89,3 +89,59 @@ class ListingsApiTests(APITestCase):
         delete_response = self.client.delete(f"/api/v1/listings/{listing_id}")
         self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
         self.assertFalse(CommodityListing.objects.filter(public_id=listing_id).exists())
+
+    def test_area_filter_includes_descendant_listing_locations(self):
+        region = AdmArea.objects.create(name="Morogoro", level=AdmArea.Level.REGION)
+        district = AdmArea.objects.create(name="Kilombero", level=AdmArea.Level.DISTRICT, parent=region)
+        ward = AdmArea.objects.create(name="Ifakara", level=AdmArea.Level.WARD, parent=district)
+        other_region = AdmArea.objects.create(name="Arusha", level=AdmArea.Level.REGION)
+
+        CommodityListing.objects.create(
+            commodity=self.commodity,
+            adm_area=region,
+            user=self.farmer,
+            title="Region listing",
+            price="1000.00",
+        )
+        CommodityListing.objects.create(
+            commodity=self.commodity,
+            adm_area=district,
+            user=self.farmer,
+            title="District listing",
+            price="2000.00",
+        )
+        CommodityListing.objects.create(
+            commodity=self.commodity,
+            adm_area=ward,
+            user=self.farmer,
+            title="Ward listing",
+            price="3000.00",
+        )
+        CommodityListing.objects.create(
+            commodity=self.commodity,
+            adm_area=other_region,
+            user=self.farmer,
+            title="Other region listing",
+            price="4000.00",
+        )
+
+        region_response = self.client.get("/api/v1/listings", {"area_id": region.public_id})
+        self.assertEqual(region_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            {listing["title"] for listing in region_response.data["data"]},
+            {"Region listing", "District listing", "Ward listing"},
+        )
+
+        district_response = self.client.get("/api/v1/listings", {"area_id": district.public_id})
+        self.assertEqual(district_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            {listing["title"] for listing in district_response.data["data"]},
+            {"District listing", "Ward listing"},
+        )
+
+        ward_response = self.client.get("/api/v1/listings", {"area_id": ward.public_id})
+        self.assertEqual(ward_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            {listing["title"] for listing in ward_response.data["data"]},
+            {"Ward listing"},
+        )

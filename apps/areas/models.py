@@ -48,5 +48,18 @@ class AdmArea(models.Model):
                 kwargs["update_fields"] = set(kwargs["update_fields"]) | {"public_id"}
         super().save(*args, **kwargs)
 
+    def descendant_ids(self, include_self=True):
+        area_ids = {self.id} if include_self else set()
+        parent_ids = [self.id]
+
+        while parent_ids:
+            child_ids = list(
+                AdmArea.objects.filter(parent_id__in=parent_ids).values_list("id", flat=True)
+            )
+            area_ids.update(child_ids)
+            parent_ids = child_ids
+
+        return area_ids
+
     def __str__(self):
         return f"{self.name} ({self.level})"
