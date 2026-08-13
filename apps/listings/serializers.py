@@ -17,6 +17,31 @@ class ListingImageSerializer(serializers.ModelSerializer):
         read_only_fields = ["image_id"]
 
 
+class ListingImageUploadSerializer(serializers.Serializer):
+    images_upload = serializers.ListField(
+        child=serializers.ImageField(),
+        write_only=True,
+        required=True,
+        allow_empty=False,
+    )
+
+    def create(self, validated_data):
+        listing = self.context["listing"]
+        created_images = []
+        start_index = listing.images.count()
+
+        for idx, image_file in enumerate(validated_data["images_upload"]):
+            created_images.append(
+                ListingImage.objects.create(
+                    listing=listing,
+                    image_url=upload_listing_image(image_file),
+                    is_primary=start_index == 0 and idx == 0,
+                )
+            )
+
+        return created_images
+
+
 class CommodityListingSerializer(serializers.ModelSerializer):
     listing_id = serializers.CharField(source="public_id", read_only=True)
     commodity = CommoditySerializer(read_only=True)
@@ -68,6 +93,20 @@ class CommodityListingSerializer(serializers.ModelSerializer):
         if not area:
             raise serializers.ValidationError(f"Administrative Area with public_id '{value}' does not exist.")
         return area
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        image_urls = attrs.get("image_urls")
+        images_upload = attrs.get("images_upload")
+
+        if self.instance is None:
+            image_count = len(image_urls or []) + len(images_upload or [])
+            if image_count < 3:
+                raise serializers.ValidationError(
+                    {"images_upload": "At least 3 listing images are required."}
+                )
+
+        return attrs
 
     def create(self, validated_data):
         commodity = validated_data.pop("commodity_id")

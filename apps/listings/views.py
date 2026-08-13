@@ -6,9 +6,9 @@ from rest_framework.views import APIView
 
 from apps.areas.models import AdmArea
 from apps.common.responses import collection_response, mutation_response, success_response
-from .models import CommodityListing
+from .models import CommodityListing, ListingImage
 from .permissions import IsSellerOrReadOnly
-from .serializers import CommodityListingSerializer
+from .serializers import CommodityListingSerializer, ListingImageSerializer, ListingImageUploadSerializer
 
 
 class CommodityListingMixin:
@@ -96,3 +96,52 @@ class CommodityListingDetailView(CommodityListingMixin, APIView):
         listing = self.get_listing(listing_id)
         listing.delete()
         return mutation_response(message="Commodity listing deleted successfully.", status_code=status.HTTP_200_OK)
+
+
+@extend_schema(tags=["Commodity Listings"])
+class ListingImageListCreateView(CommodityListingMixin, APIView):
+    parser_classes = [MultiPartParser, FormParser]
+    permission_codes = {
+        "POST": "listings.update",
+    }
+
+    @extend_schema(request=ListingImageUploadSerializer, responses={201: ListingImageSerializer(many=True)})
+    def post(self, request, listing_id):
+        listing = self.get_listing(listing_id)
+        serializer = ListingImageUploadSerializer(
+            data=request.data,
+            context={"request": request, "listing": listing},
+        )
+        serializer.is_valid(raise_exception=True)
+        images = serializer.save()
+        return mutation_response(
+            message="Listing image(s) added successfully.",
+            data=ListingImageSerializer(images, many=True).data,
+            status_code=status.HTTP_201_CREATED,
+        )
+
+
+@extend_schema(tags=["Commodity Listings"])
+class ListingImageDetailView(CommodityListingMixin, APIView):
+    permission_codes = {
+        "DELETE": "listings.update",
+    }
+
+    @extend_schema(responses={200: OpenApiResponse(description="Listing image deleted.")})
+    def delete(self, request, listing_id, image_id):
+        listing = self.get_listing(listing_id)
+        image = get_object_or_404(ListingImage, listing=listing, public_id=image_id)
+        if listing.images.count() <= 3:
+            from rest_framework.exceptions import ValidationError
+
+            raise ValidationError({"images": ["A listing must keep at least 3 images."]})
+
+        was_primary = image.is_primary
+        image.delete()
+        if was_primary:
+            next_image = listing.images.order_by("created_at").first()
+            if next_image:
+                next_image.is_primary = True
+                next_image.save(update_fields=["is_primary"])
+
+        return mutation_response(message="Listing image deleted successfully.", status_code=status.HTTP_200_OK)

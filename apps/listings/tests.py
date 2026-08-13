@@ -58,7 +58,11 @@ class ListingsApiTests(APITestCase):
                 "description": "50 bags of premium maize",
                 "price": "5000.00",
                 "quantity": "50.00",
-                "image_urls": ["http://example.com/maize1.jpg", "http://example.com/maize2.jpg"],
+                "image_urls": [
+                    "http://example.com/maize1.jpg",
+                    "http://example.com/maize2.jpg",
+                    "http://example.com/maize3.jpg",
+                ],
             },
             format="json",
         )
@@ -67,7 +71,7 @@ class ListingsApiTests(APITestCase):
         self.assertTrue(create_response.data["success"])
         listing_id = create_response.data["data"]["listing_id"]
         self.assertEqual(create_response.data["data"]["seller_id"], self.farmer.profile.public_id)
-        self.assertEqual(len(create_response.data["data"]["images"]), 2)
+        self.assertEqual(len(create_response.data["data"]["images"]), 3)
         self.assertTrue(create_response.data["data"]["images"][0]["is_primary"])
 
         # List listings
@@ -153,6 +157,7 @@ class ListingsApiTests(APITestCase):
         upload_listing_image.side_effect = [
             "https://res.cloudinary.com/demo/image/upload/listings/maize1.jpg",
             "https://res.cloudinary.com/demo/image/upload/listings/maize2.jpg",
+            "https://res.cloudinary.com/demo/image/upload/listings/maize3.jpg",
         ]
         area = AdmArea.objects.create(name="Morogoro", level="region")
         image_content = (
@@ -163,6 +168,7 @@ class ListingsApiTests(APITestCase):
         )
         image_1 = SimpleUploadedFile("maize1.gif", image_content, content_type="image/gif")
         image_2 = SimpleUploadedFile("maize2.gif", image_content, content_type="image/gif")
+        image_3 = SimpleUploadedFile("maize3.gif", image_content, content_type="image/gif")
 
         self.client.force_authenticate(self.farmer)
         response = self.client.post(
@@ -174,16 +180,83 @@ class ListingsApiTests(APITestCase):
                 "description": "50 bags of premium maize",
                 "price": "5000.00",
                 "quantity": "50.00",
-                "images_upload": [image_1, image_2],
+                "images_upload": [image_1, image_2, image_3],
             },
             format="multipart",
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(upload_listing_image.call_count, 2)
-        self.assertEqual(len(response.data["data"]["images"]), 2)
+        self.assertEqual(upload_listing_image.call_count, 3)
+        self.assertEqual(len(response.data["data"]["images"]), 3)
         self.assertEqual(
             response.data["data"]["images"][0]["image_url"],
             "https://res.cloudinary.com/demo/image/upload/listings/maize1.jpg",
         )
         self.assertTrue(response.data["data"]["images"][0]["is_primary"])
+
+    def test_create_listing_requires_at_least_three_images(self):
+        area = AdmArea.objects.create(name="Morogoro", level="region")
+        self.client.force_authenticate(self.farmer)
+
+        response = self.client.post(
+            "/api/v1/listings",
+            {
+                "commodity_id": self.commodity.public_id,
+                "adm_area_id": area.public_id,
+                "title": "Fresh maize harvest",
+                "description": "50 bags of premium maize",
+                "price": "5000.00",
+                "quantity": "50.00",
+                "image_urls": ["http://example.com/maize1.jpg", "http://example.com/maize2.jpg"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("images_upload", response.data["errors"])
+
+    @patch("apps.listings.serializers.upload_listing_image")
+    def test_farmer_can_add_and_remove_listing_images_individually(self, upload_listing_image):
+        upload_listing_image.return_value = "https://res.cloudinary.com/demo/image/upload/listings/maize4.jpg"
+        area = AdmArea.objects.create(name="Morogoro", level="region")
+        listing = CommodityListing.objects.create(
+            commodity=self.commodity,
+            adm_area=area,
+            user=self.farmer,
+            title="Fresh maize harvest",
+            price="5000.00",
+            quantity="50.00",
+        )
+        for idx in range(3):
+            ListingImage.objects.create(
+                listing=listing,
+                image_url=f"https://res.cloudinary.com/demo/image/upload/listings/maize{idx}.jpg",
+                is_primary=idx == 0,
+            )
+
+        image_content = (
+            b"\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x80\x00\x00"
+            b"\x00\x00\x00\xff\xff\xff\x21\xf9\x04\x01\x00\x00\x00"
+            b"\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02"
+            b"\x44\x01\x00\x3b"
+        )
+        image = SimpleUploadedFile("maize4.gif", image_content, content_type="image/gif")
+
+        self.client.force_authenticate(self.farmer)
+        add_response = self.client.post(
+            f"/api/v1/listings/{listing.public_id}/images",
+            {"images_upload": [image]},
+            format="multipart",
+        )
+        self.assertEqual(add_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(listing.images.count(), 4)
+
+        image_id = add_response.data["data"][0]["image_id"]
+        delete_response = self.client.delete(f"/api/v1/listings/{listing.public_id}/images/{image_id}")
+        self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(listing.images.count(), 3)
+
+        remaining_image = listing.images.first()
+        blocked_response = self.client.delete(f"/api/v1/listings/{listing.public_id}/images/{remaining_image.public_id}")
+        self.assertEqual(blocked_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(listing.images.count(), 3)
