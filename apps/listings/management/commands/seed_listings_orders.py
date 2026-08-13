@@ -446,7 +446,7 @@ class Command(BaseCommand):
         # 3. Create Commodity Listings (at least 35)
         self.stdout.write("Seeding Commodity Listings...")
         created_listings = []
-        statuses = ["active", "active", "active", "active", "sold", "inactive"]
+        statuses = ["available", "available", "available", "available", "sold_out", "draft"]
 
         for idx, tpl in enumerate(LISTING_TEMPLATES):
             commodity_obj = commodities_map.get(tpl["commodity"])

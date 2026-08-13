@@ -32,8 +32,8 @@ class OrderSerializer(serializers.ModelSerializer):
         listing = CommodityListing.objects.filter(public_id=value).first()
         if not listing:
             raise serializers.ValidationError(f"Commodity Listing with public_id '{value}' does not exist.")
-        if listing.status != "active":
-            raise serializers.ValidationError("This commodity listing is no longer active.")
+        if listing.status != CommodityListing.Status.AVAILABLE:
+            raise serializers.ValidationError("This commodity listing is not available for orders.")
         return listing
 
     def validate(self, attrs):
@@ -64,7 +64,7 @@ class OrderSerializer(serializers.ModelSerializer):
         if listing.quantity is not None:
             listing.quantity -= quantity
             if listing.quantity == 0:
-                listing.status = "sold"  # or similar status
+                listing.status = CommodityListing.Status.SOLD_OUT
             listing.save()
 
         order = Order.objects.create(

@@ -4,6 +4,12 @@ from django.conf import settings
 
 
 class CommodityListing(models.Model):
+    class Status(models.TextChoices):
+        AVAILABLE = "available", "Available"
+        SOLD_OUT = "sold_out", "Sold Out"
+        DRAFT = "draft", "Draft"
+        ARCHIVED = "archived", "Archived"
+
     public_id = models.CharField(max_length=10, unique=True, editable=False)
     commodity = models.ForeignKey(
         'commodities.Commodity',
@@ -26,7 +32,7 @@ class CommodityListing(models.Model):
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=12, decimal_places=2)
     quantity = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    status = models.CharField(max_length=50, default='active')
+    status = models.CharField(max_length=50, choices=Status.choices, default=Status.AVAILABLE)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -58,7 +58,7 @@ class OrdersApiTests(APITestCase):
             title="Premium Rice Harvest",
             price="3000.00",
             quantity="100.00",
-            status="active"
+            status="available"
         )
 
     def test_buyer_can_place_order_and_deduct_quantity(self):

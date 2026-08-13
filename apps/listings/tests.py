@@ -84,7 +84,7 @@ class ListingsApiTests(APITestCase):
             f"/api/v1/listings/{listing_id}",
             {
                 "price": "4800.00",
-                "status": "active"
+                "status": "available"
             },
             format="json",
         )
