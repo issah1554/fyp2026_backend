@@ -13,6 +13,17 @@ from .serializers import OrderSerializer
 class OrderMixin:
     permission_classes = [IsOrderParticipant]
 
+    def base_queryset(self):
+        return Order.objects.select_related(
+            "listing__commodity",
+            "listing__adm_area",
+            "listing__user__profile",
+            "user__profile",
+        ).prefetch_related(
+            "listing__user__profile__roles",
+            "user__profile__roles",
+        )
+
     def get_queryset(self):
         user = self.request.user
         if not user or not user.is_authenticated:
@@ -20,24 +31,24 @@ class OrderMixin:
             
         # Admin / staff see everything
         if user.is_staff or user.is_superuser:
-            return Order.objects.select_related("listing__commodity", "listing__adm_area", "user__profile").all()
+            return self.base_queryset().all()
             
         try:
             if user.profile.has_role(Profile.Role.ADMIN):
-                return Order.objects.select_related("listing__commodity", "listing__adm_area", "user__profile").prefetch_related("user__profile__roles").all()
+                return self.base_queryset().all()
         except Profile.DoesNotExist:
             pass
 
         # Regular user sees orders they placed, or orders for listings they own
-        return Order.objects.select_related("listing__commodity", "listing__adm_area", "user__profile").filter(
+        return self.base_queryset().filter(
             user=user
-        ) | Order.objects.select_related("listing__commodity", "listing__adm_area", "user__profile").filter(
+        ) | self.base_queryset().filter(
             listing__user=user
         )
 
     def get_order(self, order_id):
         order = get_object_or_404(
-            Order.objects.select_related("listing__commodity", "listing__adm_area", "user__profile").all(),
+            self.base_queryset().all(),
             public_id=order_id
         )
         self.check_object_permissions(self.request, order)

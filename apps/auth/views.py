@@ -1,6 +1,7 @@
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.views import APIView
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -17,6 +18,7 @@ from .serializers import (
     RegisterSerializer,
     ResendEmailVerificationSerializer,
     SessionUserSerializer,
+    SelfProfileUpdateSerializer,
     UserSerializer,
     VerifyEmailSerializer,
 )
@@ -168,15 +170,28 @@ class PasswordResetConfirmView(APIView):
     tags=["Auth"],
 )
 class MeView(APIView):
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
     permission_classes = [HasPermissionCode]
     permission_codes = {
         "GET": "auth.me",
+        "PATCH": "auth.me",
         "DELETE": "auth.account.delete",
     }
 
     @extend_schema(responses={200: SessionUserSerializer})
     def get(self, request):
         return success_response(SessionUserSerializer(request.user).data)
+
+    @extend_schema(request=SelfProfileUpdateSerializer, responses={200: SessionUserSerializer})
+    def patch(self, request):
+        serializer = SelfProfileUpdateSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return mutation_response(
+            message="Profile updated successfully.",
+            data=SessionUserSerializer(user).data,
+            status_code=status.HTTP_200_OK,
+        )
 
     @extend_schema(
         request=AccountDeletionSerializer,

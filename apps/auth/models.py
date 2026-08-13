@@ -32,6 +32,7 @@ class Profile(models.Model):
     organization = models.CharField(max_length=120, blank=True)
     farm_location = models.CharField(max_length=150, blank=True)
     farm_group = models.CharField(max_length=150, blank=True)
+    avatar_url = models.CharField(max_length=255, blank=True)
     email_verified_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

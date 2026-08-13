@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from apps.listings.models import CommodityListing
-from apps.listings.serializers import CommodityListingSerializer
+from apps.listings.serializers import CommodityListingSerializer, UserSummarySerializer
 from .models import Order
 
 
@@ -10,6 +10,7 @@ class OrderSerializer(serializers.ModelSerializer):
     listing = CommodityListingSerializer(read_only=True)
     listing_id = serializers.CharField(write_only=True)
     buyer_id = serializers.CharField(source="user.profile.public_id", read_only=True, default=None)
+    buyer = UserSummarySerializer(source="user", read_only=True)
     total_price = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
 
     class Meta:
@@ -19,12 +20,13 @@ class OrderSerializer(serializers.ModelSerializer):
             "listing",
             "listing_id",
             "buyer_id",
+            "buyer",
             "quantity",
             "total_price",
             "status",
             "created_at",
         ]
-        read_only_fields = ["order_id", "listing", "buyer_id", "total_price", "created_at"]
+        read_only_fields = ["order_id", "listing", "buyer_id", "buyer", "total_price", "created_at"]
 
     def validate_listing_id(self, value):
         listing = CommodityListing.objects.filter(public_id=value).first()

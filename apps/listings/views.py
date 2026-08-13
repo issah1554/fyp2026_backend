@@ -15,7 +15,7 @@ class CommodityListingMixin:
     permission_classes = [IsSellerOrReadOnly]
 
     def get_queryset(self):
-        return CommodityListing.objects.select_related("commodity", "adm_area", "user__profile").prefetch_related("images").all()
+        return CommodityListing.objects.select_related("commodity", "adm_area", "user__profile").prefetch_related("images", "user__profile__roles").all()
 
     def get_listing(self, listing_id):
         listing = get_object_or_404(self.get_queryset(), public_id=listing_id)

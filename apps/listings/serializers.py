@@ -8,6 +8,44 @@ from .models import CommodityListing, ListingImage
 from .services import sync_listing_image_cloudinary_metadata, upload_listing_image
 
 
+class UserSummarySerializer(serializers.Serializer):
+    user_id = serializers.SerializerMethodField()
+    username = serializers.CharField()
+    email = serializers.EmailField()
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    full_name = serializers.SerializerMethodField()
+    phone_number = serializers.SerializerMethodField()
+    organization = serializers.SerializerMethodField()
+    avatar_url = serializers.SerializerMethodField()
+    role = serializers.SerializerMethodField()
+
+    def get_user_id(self, user):
+        return getattr(getattr(user, "profile", None), "public_id", None)
+
+    def get_full_name(self, user):
+        full_name = user.get_full_name()
+        return full_name or user.username
+
+    def get_phone_number(self, user):
+        return getattr(getattr(user, "profile", None), "phone_number", "")
+
+    def get_organization(self, user):
+        return getattr(getattr(user, "profile", None), "organization", "")
+
+    def get_avatar_url(self, user):
+        return getattr(getattr(user, "profile", None), "avatar_url", "")
+
+    def get_role(self, user):
+        role = getattr(getattr(user, "profile", None), "role", None)
+        if not role:
+            return None
+        return {
+            "code": role.code,
+            "name": role.name,
+        }
+
+
 class ListingImageSerializer(serializers.ModelSerializer):
     image_id = serializers.CharField(source="public_id", read_only=True)
 
@@ -50,6 +88,7 @@ class CommodityListingSerializer(serializers.ModelSerializer):
     adm_area = AdmAreaSerializer(read_only=True)
     adm_area_id = serializers.CharField(write_only=True)
     seller_id = serializers.CharField(source="user.profile.public_id", read_only=True, default=None)
+    seller = UserSummarySerializer(source="user", read_only=True)
     images = ListingImageSerializer(many=True, read_only=True)
     image_urls = serializers.ListField(
         child=serializers.CharField(),
@@ -71,6 +110,7 @@ class CommodityListingSerializer(serializers.ModelSerializer):
             "adm_area",
             "adm_area_id",
             "seller_id",
+            "seller",
             "title",
             "description",
             "price",
@@ -81,7 +121,7 @@ class CommodityListingSerializer(serializers.ModelSerializer):
             "images_upload",
             "created_at",
         ]
-        read_only_fields = ["listing_id", "commodity", "adm_area", "seller_id", "images", "created_at"]
+        read_only_fields = ["listing_id", "commodity", "adm_area", "seller_id", "seller", "images", "created_at"]
 
     def validate_commodity_id(self, value):
         commodity = Commodity.objects.filter(public_id=value).first()

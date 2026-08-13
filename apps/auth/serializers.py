@@ -7,6 +7,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from apps.common.validators import validate_international_phone_number
+from .cloudinary_services import upload_profile_avatar
 from .models import EmailVerificationToken, PasswordResetToken, Profile
 from apps.users.models import Permission, Role
 
@@ -31,6 +32,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             "organization",
             "farm_location",
             "farm_group",
+            "avatar_url",
             "is_email_verified",
             "email_verified_at",
         ]
@@ -81,6 +83,36 @@ class LoginUserSerializer(UserSerializer):
 
 class SessionUserSerializer(LoginUserSerializer):
     pass
+
+
+class SelfProfileUpdateSerializer(serializers.Serializer):
+    first_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    last_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    phone_number = serializers.CharField(required=False, allow_blank=True)
+    organization = serializers.CharField(required=False, allow_blank=True, max_length=120)
+    farm_location = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    farm_group = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    avatar_upload = serializers.ImageField(required=False, write_only=True)
+
+    def validate_phone_number(self, value):
+        return validate_international_phone_number(value) if value else value
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        profile, _created = Profile.objects.get_or_create(user=instance)
+        avatar_upload = validated_data.pop("avatar_upload", None)
+
+        for field in ["first_name", "last_name"]:
+            if field in validated_data:
+                setattr(instance, field, validated_data.pop(field))
+        instance.save(update_fields=["first_name", "last_name"])
+
+        for field, value in validated_data.items():
+            setattr(profile, field, value)
+        if avatar_upload is not None:
+            profile.avatar_url = upload_profile_avatar(avatar_upload, instance)
+        profile.save()
+        return instance
 
 
 class RegisterSerializer(serializers.ModelSerializer):
