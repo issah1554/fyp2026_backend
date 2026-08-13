@@ -5,7 +5,7 @@ from apps.areas.serializers import AdmAreaSerializer
 from apps.commodities.serializers import CommoditySerializer
 from apps.commodities.models import Commodity
 from .models import CommodityListing, ListingImage
-from .services import upload_listing_image
+from .services import sync_listing_image_cloudinary_metadata, upload_listing_image
 
 
 class ListingImageSerializer(serializers.ModelSerializer):
@@ -31,13 +31,14 @@ class ListingImageUploadSerializer(serializers.Serializer):
         start_index = listing.images.count()
 
         for idx, image_file in enumerate(validated_data["images_upload"]):
-            created_images.append(
-                ListingImage.objects.create(
-                    listing=listing,
-                    image_url=upload_listing_image(image_file),
-                    is_primary=start_index == 0 and idx == 0,
-                )
+            listing_image = ListingImage(
+                listing=listing,
+                is_primary=start_index == 0 and idx == 0,
             )
+            listing_image.save()
+            listing_image.image_url = upload_listing_image(image_file, listing_image=listing_image)
+            listing_image.save(update_fields=["image_url"])
+            created_images.append(listing_image)
 
         return created_images
 
@@ -124,13 +125,23 @@ class CommodityListingSerializer(serializers.ModelSerializer):
             **validated_data
         )
         
-        uploaded_urls = [upload_listing_image(image_file) for image_file in images_upload]
-        for idx, url in enumerate([*image_urls, *uploaded_urls]):
-            ListingImage.objects.create(
+        for idx, url in enumerate(image_urls):
+            listing_image = ListingImage.objects.create(
                 listing=listing,
                 image_url=url,
                 is_primary=(idx == 0)
             )
+            sync_listing_image_cloudinary_metadata(listing_image)
+
+        upload_start_index = len(image_urls)
+        for upload_idx, image_file in enumerate(images_upload):
+            listing_image = ListingImage(
+                listing=listing,
+                is_primary=(upload_start_index + upload_idx == 0),
+            )
+            listing_image.save()
+            listing_image.image_url = upload_listing_image(image_file, listing_image=listing_image)
+            listing_image.save(update_fields=["image_url"])
         
         return listing
 
@@ -146,16 +157,27 @@ class CommodityListingSerializer(serializers.ModelSerializer):
         images_upload = validated_data.pop("images_upload", None)
         if image_urls is not None or images_upload is not None:
             next_image_urls = image_urls or []
-            uploaded_urls = [upload_listing_image(image_file) for image_file in (images_upload or [])]
             instance.images.all().delete()
-            for idx, url in enumerate([*next_image_urls, *uploaded_urls]):
-                ListingImage.objects.create(
+            for idx, url in enumerate(next_image_urls):
+                listing_image = ListingImage.objects.create(
                     listing=instance,
                     image_url=url,
                     is_primary=(idx == 0)
                 )
+                sync_listing_image_cloudinary_metadata(listing_image)
+            upload_start_index = len(next_image_urls)
+            for upload_idx, image_file in enumerate(images_upload or []):
+                listing_image = ListingImage(
+                    listing=instance,
+                    is_primary=(upload_start_index + upload_idx == 0),
+                )
+                listing_image.save()
+                listing_image.image_url = upload_listing_image(image_file, listing_image=listing_image)
+                listing_image.save(update_fields=["image_url"])
 
         for field, value in validated_data.items():
             setattr(instance, field, value)
         instance.save()
+        for listing_image in instance.images.all():
+            sync_listing_image_cloudinary_metadata(listing_image)
         return instance
