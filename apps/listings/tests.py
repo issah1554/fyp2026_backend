@@ -1,7 +1,9 @@
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
+from unittest.mock import patch
 
 from apps.auth.models import Profile
 from apps.areas.models import AdmArea
@@ -145,3 +147,43 @@ class ListingsApiTests(APITestCase):
             {listing["title"] for listing in ward_response.data["data"]},
             {"Ward listing"},
         )
+
+    @patch("apps.listings.serializers.upload_listing_image")
+    def test_farmer_can_upload_listing_images(self, upload_listing_image):
+        upload_listing_image.side_effect = [
+            "https://res.cloudinary.com/demo/image/upload/listings/maize1.jpg",
+            "https://res.cloudinary.com/demo/image/upload/listings/maize2.jpg",
+        ]
+        area = AdmArea.objects.create(name="Morogoro", level="region")
+        image_content = (
+            b"\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x80\x00\x00"
+            b"\x00\x00\x00\xff\xff\xff\x21\xf9\x04\x01\x00\x00\x00"
+            b"\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02"
+            b"\x44\x01\x00\x3b"
+        )
+        image_1 = SimpleUploadedFile("maize1.gif", image_content, content_type="image/gif")
+        image_2 = SimpleUploadedFile("maize2.gif", image_content, content_type="image/gif")
+
+        self.client.force_authenticate(self.farmer)
+        response = self.client.post(
+            "/api/v1/listings",
+            {
+                "commodity_id": self.commodity.public_id,
+                "adm_area_id": area.public_id,
+                "title": "Fresh maize harvest",
+                "description": "50 bags of premium maize",
+                "price": "5000.00",
+                "quantity": "50.00",
+                "images_upload": [image_1, image_2],
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(upload_listing_image.call_count, 2)
+        self.assertEqual(len(response.data["data"]["images"]), 2)
+        self.assertEqual(
+            response.data["data"]["images"][0]["image_url"],
+            "https://res.cloudinary.com/demo/image/upload/listings/maize1.jpg",
+        )
+        self.assertTrue(response.data["data"]["images"][0]["is_primary"])

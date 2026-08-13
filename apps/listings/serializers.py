@@ -5,6 +5,7 @@ from apps.areas.serializers import AdmAreaSerializer
 from apps.commodities.serializers import CommoditySerializer
 from apps.commodities.models import Commodity
 from .models import CommodityListing, ListingImage
+from .services import upload_listing_image
 
 
 class ListingImageSerializer(serializers.ModelSerializer):
@@ -29,6 +30,11 @@ class CommodityListingSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False
     )
+    images_upload = serializers.ListField(
+        child=serializers.ImageField(),
+        write_only=True,
+        required=False
+    )
 
     class Meta:
         model = CommodityListing
@@ -46,6 +52,7 @@ class CommodityListingSerializer(serializers.ModelSerializer):
             "status",
             "images",
             "image_urls",
+            "images_upload",
             "created_at",
         ]
         read_only_fields = ["listing_id", "commodity", "adm_area", "seller_id", "images", "created_at"]
@@ -66,6 +73,7 @@ class CommodityListingSerializer(serializers.ModelSerializer):
         commodity = validated_data.pop("commodity_id")
         adm_area = validated_data.pop("adm_area_id")
         image_urls = validated_data.pop("image_urls", [])
+        images_upload = validated_data.pop("images_upload", [])
         
         request = self.context.get("request")
         user = request.user if request and request.user.is_authenticated else None
@@ -77,7 +85,8 @@ class CommodityListingSerializer(serializers.ModelSerializer):
             **validated_data
         )
         
-        for idx, url in enumerate(image_urls):
+        uploaded_urls = [upload_listing_image(image_file) for image_file in images_upload]
+        for idx, url in enumerate([*image_urls, *uploaded_urls]):
             ListingImage.objects.create(
                 listing=listing,
                 image_url=url,
@@ -95,9 +104,12 @@ class CommodityListingSerializer(serializers.ModelSerializer):
             instance.adm_area = adm_area
             
         image_urls = validated_data.pop("image_urls", None)
-        if image_urls is not None:
+        images_upload = validated_data.pop("images_upload", None)
+        if image_urls is not None or images_upload is not None:
+            next_image_urls = image_urls or []
+            uploaded_urls = [upload_listing_image(image_file) for image_file in (images_upload or [])]
             instance.images.all().delete()
-            for idx, url in enumerate(image_urls):
+            for idx, url in enumerate([*next_image_urls, *uploaded_urls]):
                 ListingImage.objects.create(
                     listing=instance,
                     image_url=url,

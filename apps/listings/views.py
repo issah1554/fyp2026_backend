@@ -1,6 +1,7 @@
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.views import APIView
 
 from apps.areas.models import AdmArea
@@ -24,6 +25,7 @@ class CommodityListingMixin:
 
 @extend_schema(tags=["Commodity Listings"])
 class CommodityListingListCreateView(CommodityListingMixin, APIView):
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
     permission_codes = {
         "POST": "listings.create",
     }
@@ -66,6 +68,7 @@ class CommodityListingListCreateView(CommodityListingMixin, APIView):
 
 @extend_schema(tags=["Commodity Listings"])
 class CommodityListingDetailView(CommodityListingMixin, APIView):
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
     permission_codes = {
         "PATCH": "listings.update",
         "DELETE": "listings.delete",
