@@ -119,6 +119,7 @@ INSTALLED_APPS = [
     "apps.areas.apps.AreasConfig",
     "apps.listings.apps.ListingsConfig",
     "apps.orders.apps.OrdersConfig",
+    "apps.demand_forecasting.apps.DemandForecastingConfig",
     "apps.ussd.apps.UsspConfig",
 ]
 
