@@ -3,7 +3,7 @@ services:
     name: fyp2026-backend
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn config.wsgi:application
+    startCommand: gunicorn --pythonpath src config.wsgi:application
     envVars:
       - key: DEBUG
         value: "false"

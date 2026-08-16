@@ -120,6 +120,7 @@ INSTALLED_APPS = [
     "apps.listings.apps.ListingsConfig",
     "apps.orders.apps.OrdersConfig",
     "apps.demand_forecasting.apps.DemandForecastingConfig",
+    "apps.insights.apps.InsightsConfig",
     "apps.ussd.apps.UsspConfig",
 ]
 

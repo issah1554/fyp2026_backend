@@ -46,8 +46,13 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--output-dir",
-            default="ai",
-            help="Directory to save trained joblib model bundle and metrics CSV. Defaults to 'ai'.",
+            default="data/price_forecasting",
+            help="Directory to save price forecasting datasets/outputs. Defaults to 'data/price_forecasting'.",
+        )
+        parser.add_argument(
+            "--model-dir",
+            default="ai/models/price_forecasting",
+            help="Directory to save trained price model artifacts. Defaults to 'ai/models/price_forecasting'.",
         )
         parser.add_argument(
             "--min-rows",
@@ -61,10 +66,16 @@ class Command(BaseCommand):
         if not output_dir.is_absolute():
             output_dir = Path.cwd() / output_dir
         output_dir.mkdir(parents=True, exist_ok=True)
+        model_output_dir = Path(options["model_dir"])
+        if not model_output_dir.is_absolute():
+            model_output_dir = Path.cwd() / model_output_dir
+        outputs_dir = output_dir / "outputs"
+        model_output_dir.mkdir(parents=True, exist_ok=True)
+        outputs_dir.mkdir(parents=True, exist_ok=True)
 
-        model_output_path = output_dir / "morogoro_price_forecaster_final.joblib"
-        metrics_output_path = output_dir / "morogoro_price_model_metrics_final.csv"
-        predictions_output_path = output_dir / "morogoro_price_validation_predictions_final.csv"
+        model_output_path = model_output_dir / "morogoro_price_forecaster_final.joblib"
+        metrics_output_path = outputs_dir / "morogoro_price_model_metrics_final.csv"
+        predictions_output_path = outputs_dir / "morogoro_price_validation_predictions_final.csv"
 
         self.stdout.write("Fetching historical commodity price data from database...")
 
