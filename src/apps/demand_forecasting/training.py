@@ -157,7 +157,7 @@ def train_and_forecast(horizon_weeks=4, estimators=200, min_rows=200):
         mae = mean_absolute_error(test_df["target_demand"], predictions) if len(predictions) else 0
         rmse = mean_squared_error(test_df["target_demand"], predictions) ** 0.5 if len(predictions) else 0
 
-        model_dir = Path(settings.BASE_DIR) / "ai" / "models"
+        model_dir = Path(settings.BASE_DIR) / "ai-models"
         model_dir.mkdir(parents=True, exist_ok=True)
         model_path = model_dir / f"demand_forecast_{run.public_id}.joblib"
         metadata_path = model_dir / f"demand_forecast_{run.public_id}.json"

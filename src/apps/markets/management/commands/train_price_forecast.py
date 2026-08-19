@@ -51,8 +51,8 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--model-dir",
-            default="ai/models/price_forecasting",
-            help="Directory to save trained price model artifacts. Defaults to 'ai/models/price_forecasting'.",
+            default="ai-models",
+            help="Directory to save trained price model artifacts. Defaults to 'ai-models'.",
         )
         parser.add_argument(
             "--min-rows",

@@ -28,3 +28,4 @@ docs/bruno/environments/
 ai/*.joblib
 ai/*.csv
 scratch/
+ai-models/

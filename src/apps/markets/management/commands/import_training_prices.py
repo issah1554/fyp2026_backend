@@ -19,8 +19,11 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--file",
-            default="ai/morogoro_rice_beans_updated.csv",
-            help="Path to the training CSV file. Defaults to ai/morogoro_rice_beans_updated.csv",
+            default="data/price_forecasting/datasets/morogoro_rice_beans_updated.csv",
+            help=(
+                "Path to the training CSV file. Defaults to "
+                "data/price_forecasting/datasets/morogoro_rice_beans_updated.csv"
+            ),
         )
         parser.add_argument(
             "--user",
