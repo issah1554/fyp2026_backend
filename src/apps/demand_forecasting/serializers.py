@@ -15,7 +15,6 @@ class DemandForecastRunSerializer(serializers.ModelSerializer):
             "run_id",
             "model_type",
             "model_path",
-            "metadata_path",
             "training_started_at",
             "training_finished_at",
             "train_rows",
@@ -49,4 +48,3 @@ class DemandForecastSerializer(serializers.ModelSerializer):
             "avg_price",
             "created_at",
         ]
-

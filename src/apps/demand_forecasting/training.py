@@ -1,4 +1,3 @@
-import json
 from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
@@ -40,7 +39,6 @@ FEATURE_COLUMNS = [
 class TrainingResult:
     run: DemandForecastRun
     model_path: Path
-    metadata_path: Path
 
 
 def build_weekly_demand_frame():
@@ -159,35 +157,13 @@ def train_and_forecast(horizon_weeks=4, estimators=200, min_rows=200):
 
         model_dir = Path(settings.BASE_DIR) / "ai-models"
         model_dir.mkdir(parents=True, exist_ok=True)
-        model_path = model_dir / f"demand_forecast_{run.public_id}.joblib"
-        metadata_path = model_dir / f"demand_forecast_{run.public_id}.json"
+        model_path = model_dir / "demand_forecast.joblib"
         joblib.dump({"model": model, "features": FEATURE_COLUMNS}, model_path)
 
         forecasts = build_forecast_rows(model, df, run, horizon_weeks)
         DemandForecast.objects.bulk_create(forecasts, batch_size=1000)
 
-        metadata = {
-            "run_id": run.public_id,
-            "model_type": "RandomForestRegressor",
-            "features": FEATURE_COLUMNS,
-            "valid_statuses": VALID_DEMAND_STATUSES,
-            "training_rows": len(train_df),
-            "test_rows": len(test_df),
-            "source_rows": len(df),
-            "horizon_weeks": horizon_weeks,
-            "mae": mae,
-            "rmse": rmse,
-            "trained_at": timezone.now().isoformat(),
-            "forecast_rows": len(forecasts),
-            "date_range": {
-                "min_week": str(df["week_start"].min()),
-                "max_week": str(df["week_start"].max()),
-            },
-        }
-        metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-
         run.model_path = str(model_path.relative_to(settings.BASE_DIR))
-        run.metadata_path = str(metadata_path.relative_to(settings.BASE_DIR))
         run.training_finished_at = timezone.now()
         run.train_rows = len(train_df)
         run.test_rows = len(test_df)
@@ -196,7 +172,7 @@ def train_and_forecast(horizon_weeks=4, estimators=200, min_rows=200):
         run.status = "completed"
         run.notes = f"Generated {len(forecasts)} forecast rows for {horizon_weeks} weeks."
         run.save()
-        return TrainingResult(run=run, model_path=model_path, metadata_path=metadata_path)
+        return TrainingResult(run=run, model_path=model_path)
     except Exception as exc:
         run.status = "failed"
         run.training_finished_at = timezone.now()

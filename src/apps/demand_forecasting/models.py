@@ -8,7 +8,6 @@ class DemandForecastRun(models.Model):
     public_id = models.CharField(max_length=10, unique=True, editable=False)
     model_type = models.CharField(max_length=100, default="RandomForestRegressor")
     model_path = models.CharField(max_length=255, blank=True)
-    metadata_path = models.CharField(max_length=255, blank=True)
     training_started_at = models.DateTimeField(default=timezone.now)
     training_finished_at = models.DateTimeField(null=True, blank=True)
     train_rows = models.PositiveIntegerField(default=0)
@@ -82,4 +81,3 @@ class DemandForecast(models.Model):
 
     def __str__(self):
         return f"{self.commodity} demand at {self.adm_area} for {self.week_start}"
-
