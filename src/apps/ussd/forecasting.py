@@ -10,8 +10,8 @@ from apps.commodities.models import Commodity
 from apps.markets.models import Market
 
 
-MODEL_FILENAME = "morogoro_market_price_forecaster.joblib"
-DEFAULT_MODEL_PATH = Path(settings.BASE_DIR) / "apps" / "ussd" / "ml" / MODEL_FILENAME
+MODEL_FILENAME = "morogoro_price_forecaster_final.joblib"
+DEFAULT_MODEL_PATH = Path(settings.BASE_DIR) / "ai-models" / MODEL_FILENAME
 
 SUPPORTED_PREDICTION_COMMODITIES = ("Beans", "Rice")
 
