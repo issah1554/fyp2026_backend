@@ -11,6 +11,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 os.chdir(PROJECT_ROOT)
 sys.path.insert(0, str(SRC_DIR))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
 
 import django
 
