@@ -1,0 +1,48 @@
+meta {
+  name: Standardize Prices
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{base_url}}/api/v1/market-integrations/standardize
+  body: none
+  auth: bearer
+}
+
+params:query {
+  source: viwanda
+  commodity: 
+  market: 
+  limit: 
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+docs {
+  Converts unstandardized raw rows into normalized stored market prices.
+
+  Path params:
+  - None
+
+  Query params:
+  - source: optional source key. Use viwanda to standardize Viwanda raw records.
+  - commodity: optional commodity filter.
+  - market: optional exact market filter.
+  - limit: optional max raw rows to standardize, capped at 500.
+
+  Auth:
+  - Bearer token with market integration permission.
+
+  Reads:
+  - raw_commodity_prices where normalized_price_id is null.
+
+  Writes:
+  - commodities_prices
+  - raw_commodity_prices.normalized_price_id
+
+  Notes:
+  - This does not fetch source/cache data. Import raw records first or use Sync Prices.
+}

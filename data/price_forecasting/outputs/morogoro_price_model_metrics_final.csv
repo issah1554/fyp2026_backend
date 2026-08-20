@@ -1,0 +1,5 @@
+series_key,commodity,unit,pricetype,rows,mae,rmse,r2,mape_percent,accuracy_from_mape_percent,high_price_mae,high_price_rmse,high_price_mape_percent,high_price_accuracy_from_mape_percent,high_price_bias
+Beans|100 KG|Wholesale,Beans,100 KG,Wholesale,7396,20439.1917,26562.6458,0.2517,7.009,92.991,51998.1876,52227.3814,16.671,83.329,-51998.1876
+Beans|KG|Retail,Beans,KG,Retail,7396,220.6931,290.7347,0.3193,6.6003,93.3997,579.3101,582.0385,16.229,83.771,-579.3101
+Rice|100 KG|Wholesale,Rice,100 KG,Wholesale,7396,16600.1809,25139.275,0.645,5.837,94.163,56697.2396,57480.9969,18.4375,81.5625,-56697.2396
+Rice|KG|Retail,Rice,KG,Retail,7396,235.0183,339.4098,0.4606,7.5994,92.4006,723.6115,731.548,21.4844,78.5156,-723.6115

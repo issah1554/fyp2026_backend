@@ -12,6 +12,7 @@ venv/
 db.sqlite3
 media/
 staticfiles/
+django.log
 
 # IDEs
 .vscode/
@@ -21,3 +22,10 @@ staticfiles/
 .env.*
 !.env.example
 docs/bruno/environments/
+
+# Machine Learning model binaries
+*.joblib
+ai/*.joblib
+ai/*.csv
+scratch/
+ai-models/

@@ -1,0 +1,40 @@
+meta {
+  name: List Sources
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/api/v1/market-integrations/sources
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+docs {
+  Lists configured market integration sources.
+  
+  Path params:
+  - None
+  
+  Query params:
+  - None
+  
+  Auth:
+  - Bearer token with market integration permission.
+  
+  Response includes:
+  - key: source key such as viwanda, internal, platform_a, platform_b
+  - name
+  - source_type
+  - base_url
+  - prices_url
+  - health_url
+  - is_active
+  - last_checked_at
+  - last_imported_at
+  - last_seen_record_at
+}

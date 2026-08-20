@@ -1,0 +1,55 @@
+meta {
+  name: Sync Prices
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{base_url}}/api/v1/market-integrations/sync
+  body: none
+  auth: bearer
+}
+
+params:query {
+  source: viwanda
+  commodity: 
+  market: 
+  limit: 
+  new_only: true
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+docs {
+  Full integration sync: imports raw records, then standardizes raw records into stored market prices.
+  
+  Path params:
+  - None
+  
+  Query params:
+  - source: optional source key. Use viwanda for the Viwanda scraper cache.
+  - commodity: optional commodity filter.
+  - market: optional exact market filter.
+  - limit: optional max records to process, capped at 500.
+  - new_only: true/false. When true, imports only records newer than existing stored raw data.
+  
+  Auth:
+  - Bearer token with market integration permission.
+  
+  Reads:
+  - source/cache records
+  - for Viwanda: src/apps/market_integrations/scrapper/data/prices.json
+  
+  Writes:
+  - raw_commodity_prices
+  - commodities_prices
+  - raw_commodity_prices.normalized_price_id
+  - MarketIntegrationSource sync timestamps
+  
+  Viwanda notes:
+  - Does not download PDFs.
+  - Does not extract prices from newly discovered PDFs.
+  - Uses cached scraper prices only.
+}

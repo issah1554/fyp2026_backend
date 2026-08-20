@@ -1,0 +1,48 @@
+meta {
+  name: List Stored Prices
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{base_url}}/api/v1/market-integrations/prices
+  body: none
+  auth: bearer
+}
+
+params:query {
+  source: viwanda
+  commodity: 
+  market: 
+  search: 
+  ordering: -price_date
+  page: 1
+  page_size: 10
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+docs {
+  Lists standardized stored prices from commodities_prices.
+
+  Path params:
+  - None
+
+  Query params:
+  - source: optional source key. Use viwanda to show standardized Viwanda prices.
+  - commodity: optional commodity filter.
+  - market: optional exact market filter.
+  - search: optional search across source, market, commodity, price type, and currency.
+  - ordering: optional sort. Supported fields include source, market, commodity, price, price_date, created_at, raw_prices_count. Prefix with - for descending.
+  - page: page number.
+  - page_size: records per page, capped by API.
+
+  Auth:
+  - Bearer token with market integration permission.
+
+  Notes:
+  - These are the normalized prices used by the main market price system.
+  - Raw records can point here through raw_commodity_prices.normalized_price_id.
+}

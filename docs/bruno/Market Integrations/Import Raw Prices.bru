@@ -1,0 +1,48 @@
+meta {
+  name: Import Raw Prices
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{base_url}}/api/v1/market-integrations/import-raw
+  body: none
+  auth: bearer
+}
+
+params:query {
+  source: viwanda
+  commodity: 
+  market: 
+  limit: 
+  new_only: true
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+docs {
+  Imports source/cache records into raw_commodity_prices only.
+
+  Path params:
+  - None
+
+  Query params:
+  - source: optional source key. Use viwanda for the Viwanda scraper cache.
+  - commodity: optional commodity filter.
+  - market: optional exact market filter.
+  - limit: optional max records to import, capped at 500.
+  - new_only: true/false. When true, imports only records newer than existing stored raw data.
+
+  Auth:
+  - Bearer token with market integration permission.
+
+  Writes:
+  - raw_commodity_prices
+  - may create missing Market, Commodity, and CommodityUnit records as needed.
+  - updates MarketIntegrationSource last_imported_at/last_seen_record_at for imported records.
+
+  Does not write:
+  - commodities_prices. Use Standardize Prices or Sync Prices for that.
+}
