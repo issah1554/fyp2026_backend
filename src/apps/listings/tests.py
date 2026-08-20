@@ -177,6 +177,90 @@ class ListingsApiTests(APITestCase):
         self.assertTrue(response.data["meta"]["pagination"]["has_previous"])
         self.assertEqual(response.data["meta"]["counts"]["total"], 12)
 
+    def test_public_listing_list_only_returns_available_listings(self):
+        area = AdmArea.objects.create(name="Morogoro", level=AdmArea.Level.REGION)
+        CommodityListing.objects.create(
+            commodity=self.commodity,
+            adm_area=area,
+            user=self.farmer,
+            title="Available maize",
+            price="1000.00",
+            status=CommodityListing.Status.AVAILABLE,
+        )
+        CommodityListing.objects.create(
+            commodity=self.commodity,
+            adm_area=area,
+            user=self.farmer,
+            title="Sold maize",
+            price="1000.00",
+            status=CommodityListing.Status.SOLD_OUT,
+        )
+        CommodityListing.objects.create(
+            commodity=self.commodity,
+            adm_area=area,
+            user=self.farmer,
+            title="Draft maize",
+            price="1000.00",
+            status=CommodityListing.Status.DRAFT,
+        )
+
+        self.client.force_authenticate(user=None)
+        response = self.client.get("/api/v1/listings")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            {listing["title"] for listing in response.data["data"]},
+            {"Available maize"},
+        )
+        self.assertEqual(response.data["meta"]["pagination"]["total_items"], 1)
+
+    def test_authenticated_listing_list_includes_non_public_statuses(self):
+        area = AdmArea.objects.create(name="Morogoro", level=AdmArea.Level.REGION)
+        for listing_status, title in [
+            (CommodityListing.Status.AVAILABLE, "Available maize"),
+            (CommodityListing.Status.SOLD_OUT, "Sold maize"),
+            (CommodityListing.Status.DRAFT, "Draft maize"),
+        ]:
+            CommodityListing.objects.create(
+                commodity=self.commodity,
+                adm_area=area,
+                user=self.farmer,
+                title=title,
+                price="1000.00",
+                status=listing_status,
+            )
+
+        self.client.force_authenticate(self.admin)
+        response = self.client.get("/api/v1/listings")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            {listing["title"] for listing in response.data["data"]},
+            {"Available maize", "Sold maize", "Draft maize"},
+        )
+        self.assertEqual(response.data["meta"]["pagination"]["total_items"], 3)
+
+    def test_public_listing_detail_hides_non_available_listing(self):
+        area = AdmArea.objects.create(name="Morogoro", level=AdmArea.Level.REGION)
+        listing = CommodityListing.objects.create(
+            commodity=self.commodity,
+            adm_area=area,
+            user=self.farmer,
+            title="Draft maize",
+            price="1000.00",
+            status=CommodityListing.Status.DRAFT,
+        )
+
+        self.client.force_authenticate(user=None)
+        public_response = self.client.get(f"/api/v1/listings/{listing.public_id}")
+
+        self.client.force_authenticate(self.admin)
+        protected_response = self.client.get(f"/api/v1/listings/{listing.public_id}")
+
+        self.assertEqual(public_response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(protected_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(protected_response.data["data"]["status"], CommodityListing.Status.DRAFT)
+
     @patch("apps.listings.serializers.upload_listing_image")
     def test_farmer_can_upload_listing_images(self, upload_listing_image):
         upload_listing_image.side_effect = [

@@ -3,6 +3,7 @@ from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.permissions import SAFE_METHODS
 from rest_framework.views import APIView
 
 from apps.areas.models import AdmArea
@@ -28,7 +29,13 @@ class CommodityListingMixin:
     permission_classes = [IsSellerOrReadOnly]
 
     def get_queryset(self):
-        return CommodityListing.objects.select_related("commodity", "adm_area", "user__profile").prefetch_related("images", "user__profile__roles").all()
+        queryset = CommodityListing.objects.select_related("commodity", "adm_area", "user__profile").prefetch_related("images", "user__profile__roles").all()
+        request = getattr(self, "request", None)
+        user = getattr(request, "user", None)
+        is_public_read = request and request.method in SAFE_METHODS and not user.is_authenticated
+        if is_public_read:
+            queryset = queryset.filter(status=CommodityListing.Status.AVAILABLE)
+        return queryset
 
     def get_listing(self, listing_id):
         listing = get_object_or_404(self.get_queryset(), public_id=listing_id)
