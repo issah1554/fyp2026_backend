@@ -1,3 +1,4 @@
+from django.core.paginator import EmptyPage, Paginator
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
@@ -9,6 +10,18 @@ from apps.common.responses import collection_response, mutation_response, succes
 from .models import CommodityListing, ListingImage
 from .permissions import IsSellerOrReadOnly
 from .serializers import CommodityListingSerializer, ListingImageSerializer, ListingImageUploadSerializer
+
+
+DEFAULT_PAGE_SIZE = 9
+MAX_PAGE_SIZE = 100
+
+
+def positive_int(value, default):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
 
 
 class CommodityListingMixin:
@@ -50,8 +63,57 @@ class CommodityListingListCreateView(CommodityListingMixin, APIView):
         status_param = request.query_params.get("status")
         if status_param:
             queryset = queryset.filter(status=status_param)
-            
-        return collection_response(CommodityListingSerializer(queryset, many=True).data)
+
+        min_price = request.query_params.get("min_price")
+        if min_price:
+            queryset = queryset.filter(price__gte=min_price)
+
+        max_price = request.query_params.get("max_price")
+        if max_price:
+            queryset = queryset.filter(price__lte=max_price)
+
+        ordering_param = request.query_params.get("ordering")
+        ordering_map = {
+            "price": "price",
+            "-price": "-price",
+            "created_at": "created_at",
+            "-created_at": "-created_at",
+        }
+        ordering = ordering_map.get(ordering_param, "-created_at")
+        queryset = queryset.order_by(ordering, "-id")
+
+        page_number = positive_int(request.query_params.get("page"), 1)
+        page_size = min(positive_int(request.query_params.get("page_size"), DEFAULT_PAGE_SIZE), MAX_PAGE_SIZE)
+        paginator = Paginator(queryset, page_size)
+
+        try:
+            page = paginator.page(page_number)
+        except EmptyPage:
+            page = paginator.page(paginator.num_pages)
+
+        return collection_response(
+            CommodityListingSerializer(page.object_list, many=True).data,
+            meta={
+                "pagination": {
+                    "page": page.number,
+                    "page_size": page_size,
+                    "total_items": paginator.count,
+                    "total_pages": paginator.num_pages,
+                    "has_next": page.has_next(),
+                    "has_previous": page.has_previous(),
+                },
+                "filters": {
+                    "commodity_id": commodity_id or "",
+                    "area_id": area_id or "",
+                    "status": status_param or "",
+                    "min_price": min_price or "",
+                    "max_price": max_price or "",
+                },
+                "sorting": {"ordering": ordering},
+                "search": "",
+                "counts": {"total": paginator.count},
+            },
+        )
 
     @extend_schema(request=CommodityListingSerializer, responses={201: CommodityListingSerializer})
     def post(self, request):

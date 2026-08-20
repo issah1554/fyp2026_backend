@@ -78,6 +78,8 @@ class ListingsApiTests(APITestCase):
         list_response = self.client.get("/api/v1/listings")
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)
         self.assertGreaterEqual(len(list_response.data["data"]), 1)
+        self.assertIn("pagination", list_response.data["meta"])
+        self.assertGreaterEqual(list_response.data["meta"]["pagination"]["total_items"], 1)
 
         # Update listing
         update_response = self.client.patch(
@@ -151,6 +153,29 @@ class ListingsApiTests(APITestCase):
             {listing["title"] for listing in ward_response.data["data"]},
             {"Ward listing"},
         )
+
+    def test_listings_are_paginated_with_count_meta(self):
+        area = AdmArea.objects.create(name="Morogoro", level=AdmArea.Level.REGION)
+        for index in range(12):
+            CommodityListing.objects.create(
+                commodity=self.commodity,
+                adm_area=area,
+                user=self.farmer,
+                title=f"Maize listing {index + 1}",
+                price=f"{1000 + index}.00",
+            )
+
+        response = self.client.get("/api/v1/listings", {"page": 2, "page_size": 5})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["data"]), 5)
+        self.assertEqual(response.data["meta"]["pagination"]["page"], 2)
+        self.assertEqual(response.data["meta"]["pagination"]["page_size"], 5)
+        self.assertEqual(response.data["meta"]["pagination"]["total_items"], 12)
+        self.assertEqual(response.data["meta"]["pagination"]["total_pages"], 3)
+        self.assertTrue(response.data["meta"]["pagination"]["has_next"])
+        self.assertTrue(response.data["meta"]["pagination"]["has_previous"])
+        self.assertEqual(response.data["meta"]["counts"]["total"], 12)
 
     @patch("apps.listings.serializers.upload_listing_image")
     def test_farmer_can_upload_listing_images(self, upload_listing_image):
