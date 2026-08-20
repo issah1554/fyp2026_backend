@@ -47,7 +47,7 @@ class PredictionRefreshService:
 
     def _supported_markets(self):
         return list(
-            Market.objects.filter(is_active=True, name__in=self.forecaster.supported_market_names())
+            Market.objects.filter(status="active", name__in=self.forecaster.supported_market_names())
             .order_by("name")
         )
 

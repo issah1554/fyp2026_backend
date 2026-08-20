@@ -8,6 +8,7 @@ from django.core.management import call_command
 from django.utils import timezone
 
 from apps.auth.models import Profile
+from apps.areas.models import AdmArea
 from apps.markets.models import Market
 from apps.users.models import Role
 from apps.ussd.forecasting import calendar_week_end_date
@@ -21,6 +22,31 @@ from .models import (
 
 
 class UssdMenuViewTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.market_user = get_user_model().objects.create_user(
+            username="market-fixture-user",
+            password="StrongPass123",
+        )
+        cls.market_area = AdmArea.objects.create(
+            name="Morogoro",
+            level=AdmArea.Level.REGION,
+        )
+        cls.ifakara_market = Market.all_objects.create(
+            name="Ifakara Central Market",
+            code="IFAKARA",
+            admin_area=cls.market_area,
+            status="active",
+            created_by=cls.market_user,
+        )
+        cls.morogoro_market = Market.all_objects.create(
+            name="Morogoro Central Market",
+            code="MOROGORO",
+            admin_area=cls.market_area,
+            status="active",
+            created_by=cls.market_user,
+        )
+
     def _get_role(self, code):
         return Role.objects.get(code=code)
 
@@ -455,6 +481,55 @@ class UssdMenuViewTests(TestCase):
         )
         self.assertContains(response, "Price: TZS 245,000.50")
 
+    @patch("apps.ussd.views.send_ussd_result_sms")
+    @patch("apps.ussd.views.get_forecast_service")
+    def test_prediction_result_is_sent_by_sms_to_subscriber_number(
+        self,
+        mock_service_factory,
+        mock_send_sms,
+    ):
+        subscriber = UssdSubscriber.objects.create(
+            phone_number="+254700000041",
+            full_name="Prediction SMS User",
+            role=UssdSubscriber.Role.FARMER,
+        )
+        market = Market.objects.get(name="Ifakara Central Market")
+        UssdMarketPrediction.objects.create(
+            market=market,
+            commodity="Rice",
+            pricetype="Wholesale",
+            unit="100 KG",
+            period="monthly",
+            target_date=timezone.localdate(),
+            period_end=timezone.localdate().replace(day=31),
+            season="kiangazi kikuu",
+            predicted_price="245000.50",
+            currency="TZS",
+        )
+        mock_service_factory.return_value.get_market_options.return_value = [
+            ("1", "Ifakara Central Market"),
+        ]
+        mock_service_factory.return_value.get_commodity_options.return_value = [
+            ("2", "Rice"),
+        ]
+
+        response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession141",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": subscriber.phone_number,
+                "text": "2*1*2*2*3",
+            },
+        )
+
+        self.assertContains(response, "END Predicted Price")
+        mock_send_sms.assert_called_once()
+        sent_phone_number, sent_message = mock_send_sms.call_args.args
+        self.assertEqual(sent_phone_number, subscriber.phone_number)
+        self.assertIn("Predicted Price", sent_message)
+        self.assertNotIn("END ", sent_message)
+
     @patch("apps.ussd.views.get_forecast_service")
     def test_prediction_returns_not_available_when_cache_is_missing(self, mock_service_factory):
         subscriber = UssdSubscriber.objects.create(
@@ -588,6 +663,54 @@ class UssdMenuViewTests(TestCase):
         self.assertNotContains(response, "Confidence:")
         self.assertNotContains(response, "TZS")
 
+    @patch("apps.ussd.views.send_ussd_result_sms")
+    @patch("apps.ussd.views.get_forecast_service")
+    def test_recommendation_result_is_sent_by_sms_to_subscriber_number(
+        self,
+        mock_service_factory,
+        mock_send_sms,
+    ):
+        subscriber = UssdSubscriber.objects.create(
+            phone_number="+254700000042",
+            full_name="Recommendation SMS User",
+            role=UssdSubscriber.Role.BUYER,
+        )
+        UssdMarketRecommendation.objects.create(
+            role=UssdMarketRecommendation.Role.BUYER,
+            commodity="Beans",
+            recommendation_type=UssdMarketRecommendation.RecommendationType.TIME,
+            action=UssdMarketRecommendation.Action.BUY,
+            target_date=timezone.localdate(),
+            period=UssdMarketRecommendation.Period.WEEKLY,
+            season="kiangazi kikuu",
+            trend=UssdMarketRecommendation.Trend.FALLING,
+            recommended_price="2450.00",
+            currency="TZS",
+            confidence="84.00",
+            summary="Wait to buy until this week.",
+            reason="Best buying window is this week in kiangazi kikuu.",
+        )
+        mock_service_factory.return_value.get_commodity_options.return_value = [
+            ("1", "Beans"),
+        ]
+
+        response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession142",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": subscriber.phone_number,
+                "text": "3*1*1",
+            },
+        )
+
+        self.assertContains(response, "END Recommendation")
+        mock_send_sms.assert_called_once()
+        sent_phone_number, sent_message = mock_send_sms.call_args.args
+        self.assertEqual(sent_phone_number, subscriber.phone_number)
+        self.assertIn("Recommendation", sent_message)
+        self.assertNotIn("END ", sent_message)
+
     @patch("apps.ussd.views.get_forecast_service")
     def test_farmer_can_get_cached_sell_market_recommendation(self, mock_service_factory):
         subscriber = UssdSubscriber.objects.create(
@@ -720,6 +843,48 @@ class UssdMenuViewTests(TestCase):
         self.assertContains(response, "Season: kiangazi kikuu")
         self.assertContains(response, "Monday: Sunny, low rain, 21-30C")
         self.assertContains(response, "Tuesday: Cloudy, possible rain, 20-28C")
+
+    @patch("apps.ussd.views.send_ussd_result_sms")
+    @patch("apps.ussd.views.get_weather_service")
+    def test_weather_result_is_sent_by_sms_to_subscriber_number(
+        self,
+        mock_weather_service,
+        mock_send_sms,
+    ):
+        subscriber = UssdSubscriber.objects.create(
+            phone_number="+254700000043",
+            full_name="Weather SMS User",
+            role=UssdSubscriber.Role.FARMER,
+        )
+        mock_weather_service.return_value.fetch_weekly_forecast.return_value = {
+            "region": "Morogoro",
+            "season": "kiangazi kikuu",
+            "days": [
+                {
+                    "weekday": "Monday",
+                    "condition": "Sunny",
+                    "guidance": "low rain",
+                    "temperature": "21-30C",
+                },
+            ],
+        }
+
+        response = self.client.post(
+            reverse("ussd:menu"),
+            data={
+                "sessionId": "ATUssdSession143",
+                "serviceCode": "*384*83342#",
+                "phoneNumber": subscriber.phone_number,
+                "text": "4*2",
+            },
+        )
+
+        self.assertContains(response, "END Weather Forecast")
+        mock_send_sms.assert_called_once()
+        sent_phone_number, sent_message = mock_send_sms.call_args.args
+        self.assertEqual(sent_phone_number, subscriber.phone_number)
+        self.assertIn("Weather Forecast", sent_message)
+        self.assertNotIn("END ", sent_message)
 
     def test_view_profile_shows_saved_price_alerts(self):
         user = get_user_model().objects.create(username="+254700000001")

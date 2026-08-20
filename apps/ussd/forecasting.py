@@ -32,6 +32,52 @@ class ForecastUnavailable(Exception):
     pass
 
 
+def _set_serial_n_jobs(target, visited=None) -> None:
+    if visited is None:
+        visited = set()
+
+    target_id = id(target)
+    if target_id in visited:
+        return
+    visited.add(target_id)
+
+    if isinstance(target, dict):
+        for value in target.values():
+            _set_serial_n_jobs(value, visited)
+        return
+
+    if isinstance(target, (list, tuple, set)):
+        for value in target:
+            _set_serial_n_jobs(value, visited)
+        return
+
+    if hasattr(target, "n_jobs"):
+        try:
+            target.n_jobs = 1
+        except Exception:
+            pass
+
+    for attr_name in (
+        "steps",
+        "transformer_list",
+        "estimators",
+        "estimators_",
+        "named_steps",
+        "named_transformers_",
+        "base_estimator",
+        "regressor",
+        "classifier",
+    ):
+        if not hasattr(target, attr_name):
+            continue
+        _set_serial_n_jobs(getattr(target, attr_name), visited)
+
+
+def _prepare_bundle_for_inference(bundle: dict) -> dict:
+    _set_serial_n_jobs(bundle.get("models", {}))
+    return bundle
+
+
 def get_season_name(timestamp: pd.Timestamp) -> str:
     month = timestamp.month
     if month in (1, 2):
@@ -147,6 +193,7 @@ class MarketPriceForecaster:
             raise ForecastUnavailable(
                 "Forecast model could not be loaded on this server."
             ) from exc
+        self._bundle = _prepare_bundle_for_inference(self._bundle)
         return self._bundle
 
     def _series_key(self, market: str, commodity: str, pricetype: str) -> str:
@@ -158,7 +205,7 @@ class MarketPriceForecaster:
 
     def get_market_options(self) -> list[tuple[str, str]]:
         markets = list(
-            Market.objects.filter(is_active=True)
+            Market.objects.filter(status="active")
             .order_by("name")
             .values_list("name", flat=True)
         )

@@ -21,6 +21,7 @@ from .forecasting import (
 from .models import UssdPriceAlert, UssdSubscriber
 from .prediction_cache import get_cached_prediction
 from .recommendations import get_cached_recommendation
+from .sms import send_ussd_result_sms
 from .market_prices_api import (
     LiveMarketPricesUnavailable,
     get_market_price_service,
@@ -262,6 +263,13 @@ class UssdMenuView(View):
     def _forecast_commodity_options(self):
         return get_forecast_service().get_commodity_options()
 
+    def _send_result_sms(self, subscriber, response_text):
+        if subscriber is None or not response_text.startswith("END "):
+            return
+        sms_message = response_text[4:].strip()
+        if sms_message:
+            send_ussd_result_sms(subscriber.phone_number, sms_message)
+
     def _recommendation_prompt_lines(self, subscriber, language):
         if subscriber.role == UssdSubscriber.Role.BUYER:
             return self._text(language, "recommendation_need_buy")
@@ -469,7 +477,7 @@ class UssdMenuView(View):
             )
         return self._text(language, "invalid_choice")
 
-    def _handle_prediction(self, segments, language):
+    def _handle_prediction(self, subscriber, segments, language):
         if len(segments) == 1:
             market_lines = [f"{option}. {name}" for option, name in self._forecast_market_options()]
             title = "CON Select market\n" if language == UssdSubscriber.Language.ENGLISH else "CON Chagua soko\n"
@@ -552,7 +560,7 @@ class UssdMenuView(View):
                         f"({result.target_date.isoformat()} hadi {result.period_end.isoformat()})"
                     ),
                 }[result.period]
-                return (
+                response_text = (
                     "END Bei Iliyotabiriwa\n"
                     f"Soko: {result.market.name}\n"
                     f"Zao: {self._translate_commodity(result.commodity, language)}\n"
@@ -560,7 +568,9 @@ class UssdMenuView(View):
                     f"{period_label}\n"
                     f"Bei: {result.currency} {result.predicted_price:,.2f}"
                 )
-            return (
+                self._send_result_sms(subscriber, response_text)
+                return response_text
+            response_text = (
                 "END Predicted Price\n"
                 f"Market: {result.market.name}\n"
                 f"Commodity: {result.commodity}\n"
@@ -568,6 +578,8 @@ class UssdMenuView(View):
                 f"{period_label}\n"
                 f"Price: {result.currency} {result.predicted_price:,.2f}"
             )
+            self._send_result_sms(subscriber, response_text)
+            return response_text
         return self._text(language, "invalid_choice")
 
     def _handle_recommendations(self, subscriber, segments, language):
@@ -608,20 +620,22 @@ class UssdMenuView(View):
                         if recommendation.window_start and recommendation.window_start <= recommendation.target_date <= recommendation.window_end
                         else f"{recommendation.window_start.isoformat()} hadi {recommendation.window_end.isoformat()}"
                     )
-                    return (
+                    response_text = (
                         "END Pendekezo\n"
                         f"Muda bora wa {action}: {window}\n"
                         f"Msimu: {recommendation.season}\n"
                         f"Mwelekeo: {self._translate_trend(recommendation.trend, language)}\n"
                         f"Sababu: Mfumo unatabiri kipindi kizuri cha {action} katika msimu wa {recommendation.season}."
                     )
+                    self._send_result_sms(subscriber, response_text)
+                    return response_text
                 period_label = {
                     "daily": "today",
                     "weekly": "week",
                     "monthly": "month",
                     "seasonal": "season",
                 }.get(recommendation.period, recommendation.period)
-                return (
+                response_text = (
                     "END Recommendation\n"
                     f"{recommendation.summary}\n"
                     f"Window: {period_label}\n"
@@ -629,23 +643,29 @@ class UssdMenuView(View):
                     f"Trend: {recommendation.trend}\n"
                     f"Reason: {recommendation.reason}"
                 )
+                self._send_result_sms(subscriber, response_text)
+                return response_text
             if language == UssdSubscriber.Language.SWAHILI:
                 action = "kununua" if subscriber.role == UssdSubscriber.Role.BUYER else "kuuza"
-                return (
+                response_text = (
                     "END Pendekezo\n"
                     f"Soko bora la {action}: {recommendation.market.name if recommendation.market else '-'}\n"
                     f"Mwelekeo: {self._translate_trend(recommendation.trend, language)}\n"
                     f"Sababu: Soko hili lina bei inayotabiriwa kuwa bora zaidi leo."
                 )
-            return (
+                self._send_result_sms(subscriber, response_text)
+                return response_text
+            response_text = (
                 "END Recommendation\n"
                 f"{recommendation.summary}\n"
                 f"Trend: {recommendation.trend}\n"
                 f"Reason: {recommendation.reason}"
             )
+            self._send_result_sms(subscriber, response_text)
+            return response_text
         return self._text(language, "invalid_choice")
 
-    def _handle_weather_forecast(self, segments, language):
+    def _handle_weather_forecast(self, subscriber, segments, language):
         region_options = get_weather_region_options()
         if len(segments) == 1:
             region_lines = [f"{option}. {region.name}" for option, region in region_options]
@@ -670,18 +690,22 @@ class UssdMenuView(View):
                 for day in forecast["days"]
             ]
             if language == UssdSubscriber.Language.SWAHILI:
-                return (
+                response_text = (
                     "END Utabiri wa Hali ya Hewa\n"
                     f"Eneo: {forecast['region']}\n"
                     f"Msimu: {forecast['season']}\n"
                     + "\n".join(day_lines)
                 )
-            return (
+                self._send_result_sms(subscriber, response_text)
+                return response_text
+            response_text = (
                 "END Weather Forecast\n"
                 f"Region: {forecast['region']}\n"
                 f"Season: {forecast['season']}\n"
                 + "\n".join(day_lines)
             )
+            self._send_result_sms(subscriber, response_text)
+            return response_text
         return self._text(language, "invalid_choice")
 
     def _profile_for_subscriber(self, subscriber):
@@ -913,11 +937,11 @@ class UssdMenuView(View):
         elif segments[0] == "1":
             response_text = self._handle_market_prices(segments, language)
         elif segments[0] == "2":
-            response_text = self._handle_prediction(segments, language)
+            response_text = self._handle_prediction(subscriber, segments, language)
         elif segments[0] == "3":
             response_text = self._handle_recommendations(subscriber, segments, language)
         elif segments[0] == "4":
-            response_text = self._handle_weather_forecast(segments, language)
+            response_text = self._handle_weather_forecast(subscriber, segments, language)
         elif segments[0] == "5":
             response_text = self._handle_account(subscriber, segments, language)
         else:
