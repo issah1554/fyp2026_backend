@@ -527,26 +527,18 @@ def commodity_name(symbol):
 
 def check_viwanda_updates():
     from apps.market_integrations.scrapper.pdfs_collector import collect_documents, save_documents
-    from apps.market_integrations.scrapper.downloader import download_documents
-    from apps.market_integrations.scrapper.extract_prices import extract_all_prices, write_json
 
-    # 1. Collect only first 2 pages of viwanda website for fast updates
+    # Collect document links only. Price extraction still uses the existing local cache.
     documents = collect_documents(max_pages=2)
     save_documents(documents)
 
-    # 2. Download any new PDFs
-    downloaded = download_documents()
-
-    # 3. Extract prices from downloaded PDFs to update the local prices.json
-    records = extract_all_prices()
-    write_json(records)
-
-    # 4. Sync the prices into Django DB
+    # Sync cached extracted prices into Django DB without downloading PDFs.
     sync_result = sync_prices(source_key="viwanda")
     return {
-        "downloaded_count": len(downloaded),
-        "total_extracted": len(records),
-        "sync_result": sync_result
+        "document_count": len(documents),
+        "downloaded_count": 0,
+        "total_extracted": sync_result["fetched"],
+        "sync_result": sync_result,
     }
 
 
@@ -701,4 +693,3 @@ def run_automatic_sync():
         logger.error(f"[Auto Sync] General error in run_automatic_sync: {e}", exc_info=True)
     finally:
         connections.close_all()
-

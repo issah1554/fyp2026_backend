@@ -1,0 +1,49 @@
+meta {
+  name: Check Updates
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{base_url}}/api/v1/market-integrations/updates?source=&commodity=&market=&limit=
+  body: none
+  auth: bearer
+}
+
+params:query {
+  @description('viwanda')
+  source: 
+  commodity: 
+  market: 
+  limit: 
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+docs {
+  Checks source/cache records against stored raw records and reports whether new records exist.
+  
+  Path params:
+  - None
+  
+  Query params:
+  - source: optional source key. Use viwanda for the Viwanda scraper cache.
+  - commodity: optional commodity filter.
+  - market: optional exact market filter.
+  - limit: optional max records to inspect, capped at 500.
+  
+  Auth:
+  - Bearer token with market integration permission.
+  
+  Writes:
+  - Updates source last_checked_at and last_seen_record_at where possible.
+  - Does not import raw rows.
+  - Does not standardize prices.
+  
+  Viwanda notes:
+  - Reads src/apps/market_integrations/scrapper/data/prices.json.
+  - Does not download PDFs.
+  - Does not extract new PDF price rows.
+}

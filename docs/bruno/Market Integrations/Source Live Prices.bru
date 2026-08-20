@@ -1,0 +1,42 @@
+meta {
+  name: Source Live Prices
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{base_url}}/api/v1/market-integrations/live-prices/viwanda
+  body: none
+  auth: bearer
+}
+
+params:query {
+  commodity: 
+  market: 
+  page: 1
+  page_size: 10
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+docs {
+  Shows normalized live/cache records for one source.
+
+  Path params:
+  - source: source key in the URL. This request uses viwanda.
+
+  Query params:
+  - commodity: optional commodity name/symbol filter.
+  - market: optional exact market name filter.
+  - page: page number.
+  - page_size: records per page, capped by API.
+
+  Auth:
+  - Bearer token with market integration permission.
+
+  Notes:
+  - Equivalent to /market-integrations/live-prices?source=viwanda.
+  - This only reads source/cache data and does not write raw or normalized DB rows.
+}

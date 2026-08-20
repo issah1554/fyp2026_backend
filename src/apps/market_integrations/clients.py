@@ -101,10 +101,11 @@ def fetch_json(source, path, params=None):
             raise MarketSourceError(source.key, f"Failed to load internal price data: {exc}") from exc
 
     if source.key == "viwanda":
-        import os
-        file_path = os.path.join(settings.BASE_DIR, "apps", "market_integrations", "scrapper", "data", "prices.json")
+        from pathlib import Path
+
+        file_path = Path(settings.BASE_DIR) / "src" / "apps" / "market_integrations" / "scrapper" / "data" / "prices.json"
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with file_path.open("r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as exc:
             raise MarketSourceError(source.key, f"Failed to read local scraper cache at {file_path}: {exc}") from exc
